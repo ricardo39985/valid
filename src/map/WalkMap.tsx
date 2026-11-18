@@ -1,4 +1,4 @@
-import { Building2, LocateFixed, Minus, Plus } from 'lucide-react'
+import { Building2, Minus, Plus } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as L from 'leaflet'
 import { loadBasemap, loadRegion } from '../assets/loadAssets'
@@ -353,7 +353,6 @@ export default function WalkMap({ savedLocations, address, homeIndex, destinatio
         <button className="text-button" onClick={() => { setBaseError(false); setAttempt(value => value + 1) }}>Try again</button>
       </div>}
       {ready && <div className="map-buttons">
-        {address && <button title="Center on address" aria-label="Center on address" onClick={fitAddress}><LocateFixed size={18} /></button>}
         <button title="Zoom in" aria-label="Zoom in" onClick={() => map.current?.zoomIn(1, { animate: !prefersReducedMotion() })}><Plus size={18} /></button>
         <button title="Zoom out" aria-label="Zoom out" onClick={() => map.current?.zoomOut(1, { animate: !prefersReducedMotion() })}><Minus size={18} /></button>
       </div>}

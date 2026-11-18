@@ -137,3 +137,42 @@
 
 .tour { touch-action: pan-y pinch-zoom; }
 .tour header .tour-close { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; color: var(--muted); background: color-mix(in srgb, var(--muted) 9%, transparent); }
+
+.workspace { --sheet-gap: 28px; --sheet-grip: 32px; }
+.app .board {
+  bottom: var(--sheet-gap);
+  padding-top: 0;
+  transform: translateY(var(--sheet-drag, var(--sheet-rest, 0px)));
+  transition: transform 320ms cubic-bezier(.2,.8,.2,1);
+}
+.workspace[data-sheet-hidden] { --sheet-rest: calc(100% + var(--sheet-gap) - var(--sheet-grip) - 1px); }
+.app .board[data-dragging] { transition: none; }
+.app .sheet-handle {
+  display: grid; place-items: center; width: 100%; height: var(--sheet-grip);
+  padding: 0; margin: 0; border: 0; background: transparent; touch-action: none; cursor: grab;
+}
+.app .sheet-handle:active { cursor: grabbing; }
+.app .sheet-handle span { width: 36px; height: 4px; border-radius: 4px; background: var(--muted); opacity: .6; }
+@media (max-width: 860px) {
+  .workspace { --sheet-gap: max(8px, env(safe-area-inset-bottom)); --sheet-grip: max(36px, calc(20px + env(safe-area-inset-bottom))); }
+  .has-results .workspace[data-sheet-hidden] .map-legend { bottom: calc(var(--sheet-grip) + 22px); }
+  .app .workspace[data-sheet-hidden] .map :is(.overture-credit,.leaflet-control-attribution) { margin-bottom: calc(var(--sheet-grip) + 2px); }
+  .map-legend { transition: bottom 320ms var(--settle); }
+}
+@media (prefers-reduced-motion: reduce) { .app .board, .app .map-legend { transition: none; } }
+
+.remove-dialog {
+  width: min(352px, calc(100vw - 40px)); margin: auto; padding: 24px;
+  border: 1px solid var(--line); border-radius: 24px; color: var(--ink); background: var(--tour-bg);
+  box-shadow: var(--shadow-glass); animation: confirm-in 180ms var(--settle);
+}
+.remove-dialog::backdrop { background: #10101850; animation: confirm-in 160ms ease-out; }
+.remove-dialog h2 { margin: 0; font-size: 21px; letter-spacing: -.035em; overflow-wrap: anywhere; }
+.remove-dialog p { margin: 10px 0 20px; color: var(--muted); line-height: 1.45; }
+.remove-actions { display: flex; gap: 8px; }
+.remove-actions button { flex: 1; min-height: 44px; border-radius: 14px; background: var(--tint); color: var(--ink); font-weight: 650; }
+.remove-actions .confirm-remove { background: #b62c40; color: white; }
+@keyframes confirm-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .remove-dialog, .remove-dialog::backdrop { animation-duration: 60ms; } }
+
+.remove-dialog[data-closing]::backdrop { opacity: 0; transition: opacity 140ms ease-out; }

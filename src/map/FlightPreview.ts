@@ -1,3 +1,4 @@
+import ThemeRaster from './ThemeRaster'
 import * as L from 'leaflet'
 import { zoomPoint } from './zoomTransform'
 
@@ -11,7 +12,7 @@ export default class FlightPreview extends L.Layer {
   private readonly northWest: L.LatLng
   private readonly widthAt18: number
   private readonly heightAt18: number
-  private observer?: MutationObserver
+  private raster = new ThemeRaster(this.canvas, (target, theme) => this.paint(target, theme))
 
   constructor(bounds: L.LatLngBounds, private paneName: string, private paints: CartoPaint[]) {
     super()
@@ -27,13 +28,12 @@ export default class FlightPreview extends L.Layer {
     this.canvas.setAttribute('aria-hidden', 'true')
   }
 
-  private paint = () => {
-    const ctx = this.canvas.getContext('2d')
+  private paint(target: HTMLCanvasElement, theme: 'light' | 'dark') {
+    const ctx = target.getContext('2d')
     if (!ctx) return
     const sx = this.canvas.width / this.widthAt18
     ctx.setTransform(sx, 0, 0, this.canvas.height / this.heightAt18, 0, 0)
     ctx.clearRect(0, 0, this.widthAt18, this.heightAt18)
-    const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
     for (const { path, ink, stroke } of this.paints) {
       if (stroke) {
         ctx.strokeStyle = ink[theme]
@@ -48,15 +48,14 @@ export default class FlightPreview extends L.Layer {
 
   onAdd(map: L.Map) {
     map.getPane(this.paneName)!.append(this.canvas)
-    this.paint()
+    this.raster.redraw()
     this.position()
-    this.observer = new MutationObserver(this.paint)
-    this.observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    this.raster.start()
     return this
   }
 
   onRemove() {
-    this.observer?.disconnect()
+    this.raster.stop()
     this.canvas.remove()
     return this
   }

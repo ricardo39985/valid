@@ -25,18 +25,23 @@ export function useAppearance() {
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
   }, [])
+  const [applied, setApplied] = useState(mode)
   const dark = mode === 'auto' ? systemDark : mode === 'dark'
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light'
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1c1c1e' : '#f5f4f9')
-    savePreference('appearance', mode)
-  }, [mode, dark])
+    const useDark = applied === 'auto' ? systemDark : applied === 'dark'
+    document.documentElement.dataset.theme = useDark ? 'dark' : 'light'
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', useDark ? '#1c1c1e' : '#f5f4f9')
+    savePreference('appearance', applied)
+  }, [applied, systemDark])
   const activeReveal = useRef<ViewTransition | null>(null)
+  const revision = useRef(0)
   function chooseMode(next: Mode, button: HTMLElement) {
+    const turn = ++revision.current
     activeReveal.current?.skipTransition()
+    setMode(next)
     const nextDark = next === 'auto' ? systemDark : next === 'dark'
-    if (nextDark === dark || !document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setMode(next)
+    if (nextDark === (document.documentElement.dataset.theme === 'dark') || !document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setApplied(next)
       return
     }
     const box = button.getBoundingClientRect()
@@ -47,7 +52,7 @@ export function useAppearance() {
     root.style.setProperty('--reveal-origin', `${x}px ${y}px`)
     root.style.setProperty('--reveal-radius', `${Math.ceil(radius)}px`)
     root.dataset.appearanceReveal = ''
-    const reveal = document.startViewTransition(() => flushSync(() => setMode(next)))
+    const reveal = document.startViewTransition(() => { if (turn === revision.current) flushSync(() => setApplied(next)) })
     activeReveal.current = reveal
     void reveal.finished.finally(() => {
       if (activeReveal.current !== reveal) return

@@ -12,7 +12,10 @@ import LaunchScene from './LaunchScene'
 import NearbyList from './NearbyList'
 import FilterMenu from './FilterMenu'
 import { useAnchoredPanel } from './panelMotion'
-import { prefersReducedMotion, settle } from '../map/motion'
+import { flushSync } from 'react-dom'
+import RemoveAddressDialog from './RemoveAddressDialog'
+import SheetHandle from './SheetHandle'
+import { prefersReducedMotion } from '../map/motion'
 import { categories, homeColors, letters, sharedColor } from './categories'
 
 const walkLimits = [5, 10, 15, 20]
@@ -54,29 +57,22 @@ export default function App() {
   const [listRevision, setListRevision] = useState(0)
   const [selected, setSelected] = useState<Destination | null>(null)
   const [message, setMessage] = useState('')
+  const [removal, setRemoval] = useState<Address | null>(null)
   const addressList = useRef<HTMLUListElement>(null)
 
   const listButton = useRef<HTMLButtonElement>(null)
   const nearbyPanel = useAnchoredPanel(listOpen, listButton)
 
+  const [collapsed, setCollapsed] = useState(false)
   const sheet = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     const element = sheet.current
     if (!element) return
-    let previousTop = element.offsetTop
-    let animation: Animation | undefined
     const observer = new ResizeObserver(() => {
       element.parentElement?.style.setProperty('--board-height', element.offsetHeight + 'px')
-      const next = element.offsetTop
-      const delta = previousTop - next
-      previousTop = next
-      if (!delta || prefersReducedMotion() || !element.animate) return
-      animation?.cancel()
-      animation = element.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }],
-        { duration: 300, easing: settle })
     })
     observer.observe(element)
-    return () => { observer.disconnect(); animation?.cancel() }
+    return () => observer.disconnect()
   }, [])
 
   useLayoutEffect(() => {
@@ -120,6 +116,7 @@ export default function App() {
   }, [])
 
   const showCluster = useCallback((items: Destination[]) => {
+    setCollapsed(false)
     setCluster(items)
     setListOpen(true)
   }, [])
@@ -133,6 +130,7 @@ export default function App() {
   const closePlace = useCallback(() => setSelected(null), [])
 
   function pickAddress(address: Address) {
+    setCollapsed(false)
     const existing = homes.findIndex(home => home.address === address)
     setSelected(null)
     setCluster(null)
@@ -192,13 +190,43 @@ export default function App() {
     setMessage('')
   }
 
-  function removeAddress(at: number) {
-    if (homes.length === 1) setListOpen(false)
-    setEditing(null)
-    setCluster(null)
-    setHomes(homes.filter((_, index) => index !== at))
-    setFocus(focus > at ? focus - 1 : Math.min(focus, Math.max(0, homes.length - 2)))
-    setSelected(null)
+  async function removeAddress(address: Address) {
+    const at = homes.findIndex(home => home.address === address)
+    const list = addressList.current
+    if (at < 0 || !list) { setRemoval(null); return }
+    const rows = Array.from(list.children) as HTMLElement[]
+    const row = rows[at]
+    const reduced = prefersReducedMotion()
+    // Keep the comparison inert until the exit and the state update agree.
+    const duration = reduced ? 70 : 180
+    await row.animate([{ opacity: 1, transform: 'none' },
+      { opacity: 0, transform: reduced ? 'none' : 'translateX(-12px)' }],
+      { duration, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {})
+    const board = sheet.current!
+    const boardTop = board.getBoundingClientRect().top
+    const positions = rows.map(item => item.getBoundingClientRect().top)
+    flushSync(() => {
+      if (homes.length === 1) setListOpen(false)
+      setEditing(null)
+      setCluster(null)
+      setHomes(homes.filter(home => home.address !== address))
+      setFocus(focus > at ? focus - 1 : Math.min(focus, Math.max(0, homes.length - 2)))
+      setSelected(null)
+      setRemoval(null)
+    })
+    if (!reduced) {
+      const boardShift = boardTop - board.getBoundingClientRect().top
+      const timing = { duration: 240, easing: 'cubic-bezier(.2,.8,.2,1)' }
+      if (boardShift) board.animate([{ translate: `0 ${boardShift}px` }, { translate: '0 0' }], timing)
+      rows.forEach((item, i) => {
+        if (!item.isConnected) return
+        const delta = positions[i] - item.getBoundingClientRect().top
+        if (delta) item.animate([{ transform: `translateY(${delta}px)` }, { transform: 'none' }], timing)
+      })
+    }
+    const next = list.children[Math.min(at, list.children.length - 1)]
+    const target = next?.querySelector<HTMLButtonElement>('.shortlist-address') ?? searchRow.current?.querySelector('input')
+    target?.focus({ preventScroll: true })
   }
 
   function focusAddress(at: number) {
@@ -209,7 +237,7 @@ export default function App() {
 
   return (
     <div className={`app ${active ? 'has-results' : 'empty-map'} ${listOpen ? 'list-open' : ''}`}>
-      <main className="workspace" data-launching={launching && !tour || undefined}>
+      <main className="workspace" data-sheet-hidden={collapsed || undefined} data-launching={launching && !tour || undefined}>
         <div className="map-region">
           <WalkMap savedLocations={savedLocations} address={active?.address} homeIndex={focus} segments={segments}
             destinations={mapDestinations} framing={destinations ?? noDestinations} selected={selected}
@@ -252,6 +280,8 @@ export default function App() {
         </div>
 
         <aside className="board" ref={sheet} aria-label={active ? 'Address comparison' : 'Find an address'}>
+          <SheetHandle collapsed={collapsed} onChange={next => { setCollapsed(next); if (next) setListOpen(false) }} />
+          <div id="sheet-content" inert={collapsed || !!removal}>
           {!active ? <div className="empty-board">
             <h1>Enter your first address</h1>
             <button className="surprise" disabled={!city} onClick={surprise}><Shuffle size={17} />Surprise me</button>
@@ -262,8 +292,6 @@ export default function App() {
             }}>Try again</button></div>}
             {message && <p role="status" className="status">{message}</p>}
           </div> : <>
-            <button className="sheet-handle" type="button" aria-label={listOpen ? 'Collapse nearby places' : 'Expand nearby places'}
-              aria-expanded={listOpen} aria-controls="nearby-panel" onClick={toggleList}><span /></button>
             <div className="board-heading">
               <div>
                 {homes.length > 1 && <p className="comparison-label">Compare {homes.length} addresses</p>}
@@ -314,7 +342,7 @@ export default function App() {
                       setMessage('')
                       setEditing(i)
                     }}><Pencil size={14} /></button>
-                    <button type="button" aria-label={`Remove ${home.address[0]}`} onClick={() => removeAddress(i)}><X size={16} /></button>
+                    <button type="button" aria-label={`Remove ${home.address[0]}`} onClick={() => setRemoval(home.address)}><X size={16} /></button>
                   </div>
                 </li>
               })}
@@ -323,8 +351,14 @@ export default function App() {
             {!destinations?.length && !listOpen && <p className="status">Nothing mapped within this walk time. Try a longer walk or another category.</p>}
             <p className="method-note">Estimated walking times · Overture Maps {city?.network.release}</p>
           </>}
+          </div>
         </aside>
       </main>
+      {removal && <RemoveAddressDialog address={removal[0]} onDismiss={() => {
+        flushSync(() => setRemoval(null))
+        const index = homes.findIndex(home => home.address === removal)
+        addressList.current?.children[index]?.querySelector<HTMLButtonElement>('.row-actions button:last-child')?.focus({ preventScroll: true })
+      }} onRemove={() => void removeAddress(removal)} />}
       {tour && <Onboarding intro={launching} onIntroDone={finishLaunch} onDone={finishTour} />}
     </div>
   )

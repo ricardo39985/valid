@@ -1,3 +1,4 @@
+import ThemeRaster from './ThemeRaster'
 import * as L from 'leaflet'
 import { zoomPoint } from './zoomTransform'
 import type { CartoPaint } from './FlightPreview'
@@ -8,7 +9,8 @@ export default class ViewportDrawing extends L.Layer {
   private canvas = document.createElement('canvas')
   private corner?: L.LatLng
   private paintedZoom = 0
-  private observer?: MutationObserver
+  private paintFrame?: { visible: L.LatLngBounds; ratio: number; scale: number; origin: L.Point }
+  private raster = new ThemeRaster(this.canvas, (target, theme) => this.paint(target, theme))
 
   constructor(private bounds: L.LatLngBounds, private paneName: string, private paints: CartoPaint[]) {
     super()
@@ -19,13 +21,12 @@ export default class ViewportDrawing extends L.Layer {
   onAdd(map: L.Map) {
     map.getPane(this.paneName)!.append(this.canvas)
     this.draw()
-    this.observer = new MutationObserver(this.draw)
-    this.observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    this.raster.start()
     return this
   }
 
   onRemove() {
-    this.observer?.disconnect()
+    this.raster.stop()
     this.canvas.remove()
     return this
   }
@@ -38,7 +39,6 @@ export default class ViewportDrawing extends L.Layer {
     const pad = size.multiplyBy(.12).round()
     const extent = size.add(pad.multiplyBy(2))
     const start = map.containerPointToLatLng(pad.multiplyBy(-1))
-    const visible = L.latLngBounds(start, map.containerPointToLatLng(size.add(pad)))
     const ratio = Math.min(window.devicePixelRatio || 1, 2)
     this.canvas.width = Math.ceil(extent.x * ratio)
     this.canvas.height = Math.ceil(extent.y * ratio)
@@ -47,12 +47,20 @@ export default class ViewportDrawing extends L.Layer {
     this.corner = start
     this.paintedZoom = map.getZoom()
     this.position()
-    const ctx = this.canvas.getContext('2d')
-    if (!ctx) return
-    const scale = map.getZoomScale(this.paintedZoom, 18)
-    const origin = map.latLngToContainerPoint(this.bounds.getNorthWest()).add(pad)
+    this.paintFrame = {
+      visible: L.latLngBounds(start, map.containerPointToLatLng(size.add(pad))),
+      origin: map.latLngToContainerPoint(this.bounds.getNorthWest()).add(pad),
+      scale: map.getZoomScale(this.paintedZoom, 18),
+      ratio,
+    }
+    this.raster.redraw()
+  }
+
+  private paint(target: HTMLCanvasElement, theme: 'light' | 'dark') {
+    const ctx = target.getContext('2d')
+    if (!ctx || !this.paintFrame) return
+    const { visible, ratio, scale, origin } = this.paintFrame
     ctx.setTransform(scale * ratio, 0, 0, scale * ratio, origin.x * ratio, origin.y * ratio)
-    const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
     for (const { path, ink, stroke, width, bounds } of this.paints) {
       if (bounds && !visible.intersects(bounds)) continue
       if (stroke) {
