@@ -524,3 +524,17 @@ h1, p { margin: 0; }
   .nearby-panel-heading .nearby-back { animation: none; }
   .filter-chevron { transition: none; }
 }
+
+.launch-scene {
+  position: absolute; inset: 0; z-index: 3; display: grid; place-items: center;
+  background: radial-gradient(ellipse at 50% 38%, #fcfbff, #eeedf9);
+  pointer-events: none;
+}
+.launch-scene img { width: min(438px, 96%, 75dvh); aspect-ratio: 1; }
+[data-launching] .map-chrome .search-field::after {
+  content: '610 20th St'; position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%); color: #493965; font-size: 12px;
+  font-weight: 650; pointer-events: none;
+  animation: launch-address-out 210ms 1080ms ease both;
+}
+@keyframes launch-address-out { to { opacity: 0; } }

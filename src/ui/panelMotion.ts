@@ -7,43 +7,60 @@ function transformBetween(from: DOMRect, to: DOMRect) {
 
 export function useAnchoredPanel(open: boolean, anchor: RefObject<HTMLButtonElement | null>) {
   const panel = useRef<HTMLDivElement>(null)
-  const animation = useRef<Animation | null>(null)
+  const running = useRef<Animation[]>([])
 
   useLayoutEffect(() => {
     const element = panel.current
     const button = anchor.current
     if (!element || !button) return
-    const wasVisible = element.dataset.visible === 'true'
-    if (!open && !wasVisible) return
-
-    // Measure the currently drawn frame before cancelling so quick reversals
-    // resume from the current shape instead of jumping to an endpoint.
-    const from = wasVisible ? element.getBoundingClientRect() : button.getBoundingClientRect()
-    animation.current?.cancel()
-    // Make the entire panel available for measurement in this layout pass.
-    // Display, background, and children remain together through the final frame.
-    element.dataset.visible = 'true'
-    const natural = element.getBoundingClientRect()
-    if (!element.animate || prefersReducedMotion() || !natural.width || !natural.height) {
+    const stop = () => {
+      for (const motion of running.current) motion.cancel()
+      running.current = []
+    }
+    if (!element.animate || prefersReducedMotion()) {
+      stop()
       element.dataset.visible = String(open)
-      animation.current = null
       return
     }
+    if (!open && element.dataset.visible !== 'true') return
+    element.dataset.visible = 'true'
 
-    const to = open ? natural : button.getBoundingClientRect()
-    const motion = element.animate([
-      { transform: transformBetween(from, natural), borderRadius: wasVisible ? '23px' : '16px' },
-      { transform: transformBetween(to, natural), borderRadius: open ? '23px' : '16px' },
-    ], { duration: open ? 350 : 300, easing: settle, fill: 'both' })
-    animation.current = motion
-    motion.onfinish = () => {
+    if (!running.current.length) {
+      const box = element.getBoundingClientRect()
+      const target = button.getBoundingClientRect()
+      const dx = target.left + target.width / 2 - box.left - box.width / 2
+      const dy = target.top + target.height / 2 - box.top - box.height / 2
+      const cutX = Math.max(0, (box.width - target.width) / 2)
+      const cutY = Math.max(0, (box.height - target.height) / 2)
+      const radius = getComputedStyle(element).borderRadius
+      const timing: KeyframeAnimationOptions = { duration: 360, fill: 'both' }
+      // Move a full-size surface through a shrinking window. Letterforms never scale.
+      const shell = element.animate([
+        { transform: `translate(${dx}px, ${dy}px)`, clipPath: `inset(${cutY}px ${cutX}px round ${target.height / 2}px)`, easing: 'cubic-bezier(.3,0,.18,1)' },
+        { transform: 'translate(0, 0)', clipPath: `inset(0px 0px round ${radius})`, offset: .84 },
+        { transform: 'translate(0, 0)', clipPath: `inset(-36px -36px round ${radius})` },
+      ], timing)
+      const surface = element.animate([{ opacity: 0 }, { opacity: 1, offset: .32 }, { opacity: 1 }], timing)
+      const content = element.firstElementChild!.animate([
+        { opacity: 0 }, { opacity: 0, offset: .32 }, { opacity: 1, offset: .83 }, { opacity: 1 },
+      ], timing)
+      running.current = [shell, surface, content]
+      if (!open) for (const motion of running.current) motion.currentTime = 360
+    }
+    for (const motion of running.current) {
+      motion.playbackRate = open ? 1 : -1
+      motion.play()
+    }
+    running.current[0].onfinish = () => {
       element.dataset.visible = String(open)
-      motion.cancel()
-      if (animation.current === motion) animation.current = null
+      stop()
     }
   }, [open, anchor])
 
-  useLayoutEffect(() => () => animation.current?.cancel(), [])
+  useLayoutEffect(() => () => {
+    for (const motion of running.current) motion.cancel()
+    running.current = []
+  }, [])
 
   return panel
 }

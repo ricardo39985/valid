@@ -7,6 +7,7 @@ import type { Address, CategoryFilter, Destination } from '../routing/types'
 import { createRouter, filterDestinations, routeSegments } from '../routing/walk'
 import AddressSearch from './AddressSearch'
 import AddressFocusRing from './AddressFocusRing'
+import LaunchScene from './LaunchScene'
 import NearbyList from './NearbyList'
 import FilterMenu from './FilterMenu'
 import { useAnchoredPanel } from './panelMotion'
@@ -22,6 +23,8 @@ const noDestinations: Destination[] = []
 type Home = { address: Address; destinations: Destination[] }
 
 export default function App() {
+  const [launching, setLaunching] = useState(() => !prefersReducedMotion() && typeof Element.prototype.animate === 'function')
+  const finishLaunch = useCallback(() => setLaunching(false), [])
   const [city, setCity] = useState<City | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [error, setError] = useState(false)
@@ -181,11 +184,12 @@ export default function App() {
 
   return (
     <div className={`app ${active ? 'has-results' : 'empty-map'} ${listOpen ? 'list-open' : ''}`}>
-      <main className="workspace">
+      <main className="workspace" data-launching={launching || undefined}>
         <div className="map-region">
           <WalkMap address={active?.address} homeIndex={focus} segments={segments}
             destinations={mapDestinations} framing={destinations ?? noDestinations} selected={selected}
             onCluster={showCluster} onSelect={selectPlace} onClose={closePlace} />
+          {launching && <LaunchScene onFinish={finishLaunch} />}
           <div className="map-chrome">
             <AddressSearch index={index} disabled={!city || homes.length >= maxAddresses} onChoose={pickAddress}
               placeholder={homes.length >= maxAddresses ? 'Five addresses added' : active ? 'Add a San Francisco address' : 'Enter your first address'} />

@@ -86,7 +86,7 @@ export default function FilterMenu<T extends string | number>({ label, value, op
     </button>
     <div ref={panel} id={id} role="listbox" className="filter-popover" aria-label={label}
       aria-hidden={!open} inert={!open} onKeyDown={navigate}>
-      {options.map(option => {
+      <div>{options.map(option => {
         const Icon = option.icon
         const isSelected = option.value === value
         return <button type="button" key={option.value} role="option" tabIndex={-1} aria-selected={isSelected}
@@ -95,7 +95,7 @@ export default function FilterMenu<T extends string | number>({ label, value, op
           <span>{option.label}</span>
           {isSelected && <Check size={16} className="filter-check" aria-hidden="true" />}
         </button>
-      })}
+      })}</div>
     </div>
   </div>
 }
