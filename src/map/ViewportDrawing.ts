@@ -6,11 +6,11 @@ import type { CartoPaint } from './FlightPreview'
 // Paint settled detail into a screen-sized buffer. Its dimensions never grow
 // with the geographic extent of the city, even at the closest zoom.
 export default class ViewportDrawing extends L.Layer {
-  private canvas = document.createElement('canvas')
   private corner?: L.LatLng
   private paintedZoom = 0
   private paintFrame?: { visible: L.LatLngBounds; ratio: number; scale: number; origin: L.Point }
-  private raster = new ThemeRaster(this.canvas, (target, theme) => this.paint(target, theme))
+  private raster = new ThemeRaster(document.createElement('canvas'), (target, theme) => this.paint(target, theme))
+  private get canvas() { return this.raster.canvas }
 
   constructor(private bounds: L.LatLngBounds, private paneName: string, private paints: CartoPaint[]) {
     super()

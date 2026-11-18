@@ -1,15 +1,23 @@
 type Theme = 'light' | 'dark'
 const currentTheme = (): Theme => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
 
-// Keep an alternate bitmap ready while the appearance menu is open. A theme
-// change can then reuse the street drawing without traversing its geometry.
+// Prepare the alternate palette while the appearance menu is open. Swapping
+// the canvas keeps raster work out of the view transition's capture callback.
 export default class ThemeRaster {
-  private cache: Partial<Record<Theme, HTMLCanvasElement>> = {}
+  private alternate?: HTMLCanvasElement
   private painted?: Theme
+  private preparing = false
+  private idleHandle?: number
   private observer = new MutationObserver(() => this.refresh())
-  constructor(private canvas: HTMLCanvasElement, private paint: (target: HTMLCanvasElement, theme: Theme) => void) {}
 
-  private release = () => { this.cache = {} }
+  constructor(public canvas: HTMLCanvasElement, private paint: (target: HTMLCanvasElement, theme: Theme) => void) {}
+
+  private release = () => {
+    this.preparing = false
+    this.alternate = undefined
+    if (this.idleHandle !== undefined) cancelIdleCallback(this.idleHandle)
+    this.idleHandle = undefined
+  }
 
   start() {
     window.addEventListener('release-map-appearance', this.release)
@@ -21,42 +29,53 @@ export default class ThemeRaster {
     window.removeEventListener('release-map-appearance', this.release)
     this.observer.disconnect()
     window.removeEventListener('prepare-map-appearance', this.prepare)
-    this.cache = {}
+    this.release()
   }
 
   redraw() {
-    this.cache = {}
+    this.alternate = undefined
     this.painted = currentTheme()
     const ctx = this.canvas.getContext('2d')
     ctx?.resetTransform()
     ctx?.clearRect(0, 0, this.canvas.width, this.canvas.height)
     this.paint(this.canvas, this.painted)
+    if (this.preparing) this.prepare()
   }
 
   private prepare = () => {
-    if (!this.painted || this.cache[this.painted]) return
-    const other = this.painted === 'dark' ? 'light' : 'dark'
-    for (const theme of [this.painted, other] as const) {
-      const target = document.createElement('canvas')
-      target.width = this.canvas.width
-      target.height = this.canvas.height
-      if (theme === this.painted) target.getContext('2d')?.drawImage(this.canvas, 0, 0)
-      else this.paint(target, theme)
-      this.cache[theme] = target
+    this.preparing = true
+    if (this.alternate || !this.painted || this.idleHandle !== undefined) return
+    if (typeof requestIdleCallback === 'function') {
+      this.idleHandle = requestIdleCallback(() => {
+        this.idleHandle = undefined
+        this.paintAlternate()
+      })
+    } else {
+      this.paintAlternate()
     }
+  }
+
+  private paintAlternate() {
+    if (!this.painted || this.alternate) return
+    const target = document.createElement('canvas')
+    target.width = this.canvas.width
+    target.height = this.canvas.height
+    this.paint(target, this.painted === 'dark' ? 'light' : 'dark')
+    this.alternate = target
   }
 
   private refresh() {
     const theme = currentTheme()
     if (this.painted === theme) return
-    const bitmap = this.cache[theme]
-    const context = this.canvas.getContext('2d')
-    if (!bitmap || !context) { this.redraw(); return }
-    context.save()
-    context.resetTransform()
-    context.globalCompositeOperation = 'copy'
-    context.drawImage(bitmap, 0, 0)
-    context.restore()
-    this.painted = currentTheme()
+    const next = this.alternate
+    if (!next) { this.redraw(); return }
+    const previous = this.canvas
+    next.className = previous.className
+    next.style.cssText = previous.style.cssText
+    next.setAttribute('aria-hidden', 'true')
+    previous.replaceWith(next)
+    this.canvas = next
+    this.alternate = previous
+    this.painted = theme
   }
 }

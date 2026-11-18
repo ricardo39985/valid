@@ -8,11 +8,11 @@ export type CartoPaint = { path: Path2D; ink: Ink; stroke: boolean; width: numbe
 // Rasterize the same geographic paths once per theme. During a flight the browser
 // only translates and scales this bitmap; the street geometry stays in memory.
 export default class FlightPreview extends L.Layer {
-  private readonly canvas = document.createElement('canvas')
   private readonly northWest: L.LatLng
   private readonly widthAt18: number
   private readonly heightAt18: number
-  private raster = new ThemeRaster(this.canvas, (target, theme) => this.paint(target, theme))
+  private raster = new ThemeRaster(document.createElement('canvas'), (target, theme) => this.paint(target, theme))
+  private get canvas() { return this.raster.canvas }
 
   constructor(bounds: L.LatLngBounds, private paneName: string, private paints: CartoPaint[]) {
     super()

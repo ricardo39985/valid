@@ -14,14 +14,13 @@ export default function SearchTools({ onTour }: { onTour: () => void }) {
   const id = useId()
   useEffect(() => {
     if (!open) return
-    const prepare = window.setTimeout(() => window.dispatchEvent(new Event('prepare-map-appearance')), 240)
+    window.dispatchEvent(new Event('prepare-map-appearance'))
     const outside = (event: Event) => {
       if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false)
     }
     document.addEventListener('pointerdown', outside)
     document.addEventListener('focusin', outside)
     return () => {
-      window.clearTimeout(prepare)
       window.dispatchEvent(new Event('release-map-appearance'))
       document.removeEventListener('pointerdown', outside)
       document.removeEventListener('focusin', outside)
