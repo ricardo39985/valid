@@ -7,6 +7,9 @@ import type { Address, CategoryFilter, Destination } from '../routing/types'
 import { createRouter, filterDestinations, routeSegments } from '../routing/walk'
 import AddressSearch from './AddressSearch'
 import AddressFocusRing from './AddressFocusRing'
+import Onboarding from './Onboarding'
+import SearchTools from './SearchTools'
+import { readPreference, savePreference } from './preferences'
 import LaunchScene from './LaunchScene'
 import NearbyList from './NearbyList'
 import FilterMenu from './FilterMenu'
@@ -24,6 +27,17 @@ type Home = { address: Address; destinations: Destination[] }
 
 export default function App() {
   const [launching, setLaunching] = useState(() => !prefersReducedMotion() && typeof Element.prototype.animate === 'function')
+  const [tour, setTour] = useState(() => readPreference('tour') !== 'seen')
+  const searchRow = useRef<HTMLDivElement>(null)
+  function finishTour() {
+    savePreference('tour', 'seen')
+    setTour(false)
+    requestAnimationFrame(() => {
+      const field = searchRow.current?.querySelector<HTMLInputElement>('input:enabled')
+      const target = field ?? searchRow.current?.querySelector<HTMLButtonElement>('.more-tools')
+      target?.focus({ preventScroll: true })
+    })
+  }
   const finishLaunch = useCallback(() => setLaunching(false), [])
   const [city, setCity] = useState<City | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -184,15 +198,18 @@ export default function App() {
 
   return (
     <div className={`app ${active ? 'has-results' : 'empty-map'} ${listOpen ? 'list-open' : ''}`}>
-      <main className="workspace" data-launching={launching || undefined}>
+      <main className="workspace" data-launching={launching && !tour || undefined}>
         <div className="map-region">
           <WalkMap address={active?.address} homeIndex={focus} segments={segments}
             destinations={mapDestinations} framing={destinations ?? noDestinations} selected={selected}
             onCluster={showCluster} onSelect={selectPlace} onClose={closePlace} />
-          {launching && <LaunchScene onFinish={finishLaunch} />}
+          {launching && !tour && <LaunchScene onFinish={finishLaunch} />}
           <div className="map-chrome">
-            <AddressSearch index={index} disabled={!city || homes.length >= maxAddresses} onChoose={pickAddress}
-              placeholder={homes.length >= maxAddresses ? 'Five addresses added' : active ? 'Add a San Francisco address' : 'Enter your first address'} />
+            <div className="search-row" ref={searchRow}>
+              <AddressSearch index={index} disabled={!city || homes.length >= maxAddresses} onChoose={pickAddress}
+                placeholder={homes.length >= maxAddresses ? 'Five addresses added' : active ? 'Add a San Francisco address' : 'Enter your first address'} />
+              <SearchTools onTour={() => { setLaunching(false); setTour(true) }} />
+            </div>
             <div className="map-toolbar">
               <FilterMenu label="Destination category" value={category} options={categoryOptions}
                 open={openFilter === 'category'} onOpen={open => setOpenFilter(current => open ? 'category' : current === 'category' ? null : current)}
@@ -239,11 +256,12 @@ export default function App() {
             <div className="board-heading">
               <div>
                 {homes.length > 1 && <p className="comparison-label">Compare {homes.length} addresses</p>}
-                <h1 key={active.address[0] + category} className="focus-heading">{category === 'all' ? active.address[0] : `${categories[category].label} near ${active.address[0]}`}</h1>
+                <h1 key={active.address[0] + category} className="focus-heading"><span className="desktop-only">{homes.length > 1 ? 'Compare addresses' : active.address[0]}</span><span className="mobile-only">{category === 'all' ? active.address[0] : `${categories[category].label} near ${active.address[0]}`}</span></h1>
+                <span className="board-subtitle desktop-only">{category === 'all' ? 'Places' : categories[category].label} within a {minutes}-minute walk</span>
               </div>
               <button ref={listButton} className="subtle-button nearby-trigger" aria-expanded={listOpen} aria-controls="nearby-panel"
                 onClick={toggleList}>
-                <List size={17} />List
+                <List size={17} /><span className="mobile-only">List</span><span className="desktop-only">Nearby places</span>
               </button>
             </div>
 
@@ -295,6 +313,7 @@ export default function App() {
           </>}
         </aside>
       </main>
+      {tour && <Onboarding intro={launching} onIntroDone={finishLaunch} onDone={finishTour} />}
     </div>
   )
 }

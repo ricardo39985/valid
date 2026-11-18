@@ -29,7 +29,7 @@ export default function LaunchScene({ onFinish }: { onFinish: () => void }) {
     for (const child of search.children) move(child, [{ opacity: 0 }, { opacity: 1 }], 1280, 350)
     move(layer.firstElementChild!, [{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(.91)' }], 1080, 350)
     move(layer, [{ opacity: 1 }, { opacity: 0 }], 1160, 540)
-    for (const selector of ['.board', '.map-toolbar', '.map-buttons']) {
+    for (const selector of ['.board', '.map-toolbar', '.search-tools', '.map-buttons']) {
       const element = workspace.querySelector(selector)
       if (element) move(element, [
         { opacity: 0, transform: `translateY(${selector === '.map-toolbar' ? -10 : 16}px)` },

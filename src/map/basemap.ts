@@ -4,9 +4,9 @@ import type { LineString, MultiLineString } from 'geojson'
 import type { Basemap } from '../assets/loadAssets'
 
 const areaColors: Record<string, string> = {
-  land: '#f6f2eb',
-  green: '#d8e8d5',
-  water: '#cddcf5',
+  land: 'var(--map-land, #f6f2eb)',
+  green: 'var(--map-green, #d8e8d5)',
+  water: 'var(--map-water, #cddcf5)',
 }
 
 export function addBasemap(map: L.Map, data: Basemap) {
@@ -26,8 +26,8 @@ export function addBasemap(map: L.Map, data: Basemap) {
     const lines = feature.properties?.major ? mainStreets : streets
     for (const path of segments) lines.push(path.map(([lng, lat]) => [lat, lng]))
   }
-  L.polyline(streets, { interactive: false, color: '#ded8cf', weight: 1.4 }).addTo(map)
-  L.polyline(mainStreets, { interactive: false, color: '#d4c4ad', weight: 2.4 }).addTo(map)
+  L.polyline(streets, { interactive: false, color: 'var(--map-road, #ded8cf)', weight: 1.4 }).addTo(map)
+  L.polyline(mainStreets, { interactive: false, color: 'var(--map-artery, #d4c4ad)', weight: 2.4 }).addTo(map)
 
   const labels = L.layerGroup().addTo(map)
   function updateLabels() {
