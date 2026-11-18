@@ -40,19 +40,35 @@ h1, p { margin: 0; }
   position: absolute; top: 20px; left: 24px; right: 24px;
   display: flex; gap: 8px; z-index: 2; pointer-events: none;
 }
+.filter-control { position: relative; pointer-events: auto; }
+.filter-control[data-open="true"] { z-index: 2; }
 .glass-select {
-  display: flex; align-items: center; gap: 7px; position: relative;
-  pointer-events: auto; border: 1px solid #fff; background: var(--glass);
-  backdrop-filter: blur(18px); border-radius: 24px; color: #514e67;
-  box-shadow: var(--shadow-glass);
+  display: flex; align-items: center; gap: 7px; min-height: 43px; padding: 0 12px;
+  border: 1px solid #fff; background: var(--glass); backdrop-filter: blur(18px);
+  border-radius: 24px; color: var(--ink); box-shadow: var(--shadow-glass);
+  font-size: 14px; font-weight: 650; white-space: nowrap;
 }
-.glass-select > svg:first-child { position: absolute; left: 13px; pointer-events: none; }
-.glass-select > svg:last-child { position: absolute; right: 12px; pointer-events: none; }
-.glass-select select {
-  appearance: none; border: 0; background: transparent; color: var(--ink);
-  border-radius: inherit; min-height: 44px; padding: 0 31px 0 36px;
-  font-size: 14px; font-weight: 650; cursor: pointer;
+.filter-chevron { color: #514e67; transition: transform 230ms var(--settle); }
+.glass-select[aria-expanded="true"] .filter-chevron { transform: rotate(180deg); }
+.filter-popover {
+  position: absolute; z-index: 2; top: calc(100% + 6px); left: 0;
+  width: max-content; min-width: max(100%, 171px); padding: 5px;
+  background: #fdfbff; border: 1px solid #fff; border-radius: 23px;
+  box-shadow: 0 8px 24px #36265334;
+  transform-origin: top left; isolation: isolate; overflow: hidden;
+  max-height: min(290px, calc(100dvh - 145px)); overflow-y: auto;
 }
+.filter-control:last-child .filter-popover { left: auto; right: 0; min-width: max(100%, 153px); }
+.filter-popover button {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 39px; padding: 0 8px;
+  background: transparent; border: 0; border-radius: 11px; text-align: left;
+  font-size: 13px; white-space: nowrap;
+}
+.filter-popover button:hover, .filter-popover button:focus-visible { background: #eee9fa; }
+.filter-popover button:focus-visible { outline-offset: -2px; }
+.filter-popover button[aria-selected="true"] { color: #4e38cc; font-weight: 750; }
+.filter-check { margin-left: auto; }
+.filter-popover[inert] { pointer-events: none; }
 .map-buttons {
   position: absolute; z-index: 1; right: 20px; top: 45%;
   display: grid; overflow: hidden; border-radius: 16px; border: 1px solid #fff;
@@ -326,7 +342,6 @@ h1, p { margin: 0; }
 }
 .map-chrome .search-field { border-radius: 27px; min-height: 51px; padding-inline: 15px; }
 .map-chrome .search-field input { height: 49px; }
-.map-chrome .glass-select select { min-height: 41px; }
 .map-editor {
   position: absolute;
   inset: 43% auto auto 50%;
@@ -387,14 +402,14 @@ h1, p { margin: 0; }
   bottom: calc(100% + 8px);
   inset-inline: 10px;
   border-radius: 23px;
-  background: #fdfbfff9;
+  background: #fdfbff;
   border: 1px solid #fff;
   box-shadow: 0 8px 32px #36265334;
   transform-origin: top left;
-  visibility: hidden;
+  isolation: isolate;
   overflow: hidden;
 }
-.list-drawer[data-visible="true"] { visibility: visible; }
+.list-drawer:not([data-visible="true"]), .filter-popover:not([data-visible="true"]) { display: none; }
 .list-drawer[inert] { pointer-events: none; }
 .list-drawer-content { padding: 9px 12px 11px; }
 .nearby-panel-heading { gap: 6px; }
@@ -507,4 +522,5 @@ h1, p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   .nearby-view { transition: none; transform: none !important; }
   .nearby-panel-heading .nearby-back { animation: none; }
+  .filter-chevron { transition: none; }
 }

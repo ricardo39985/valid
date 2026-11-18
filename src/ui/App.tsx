@@ -1,4 +1,4 @@
-import { ChevronDown, Footprints, List, MapPin, Pencil, Shuffle, X } from 'lucide-react'
+import { Footprints, List, MapPin, Pencil, Shuffle, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { buildAddressIndex } from '../data'
 import { loadCity, type City } from '../assets/loadAssets'
@@ -8,11 +8,14 @@ import { createRouter, filterDestinations, routeSegments } from '../routing/walk
 import AddressSearch from './AddressSearch'
 import AddressFocusRing from './AddressFocusRing'
 import NearbyList from './NearbyList'
+import FilterMenu from './FilterMenu'
 import { useAnchoredPanel } from './panelMotion'
 import { prefersReducedMotion, settle } from '../map/motion'
 import { categories, homeColors, letters, sharedColor } from './categories'
 
 const walkLimits = [5, 10, 15, 20]
+const categoryOptions = (Object.keys(categories) as CategoryFilter[]).map(value => ({ value, ...categories[value] }))
+const walkOptions = walkLimits.map(value => ({ value, label: `${value} min walk`, icon: Footprints }))
 const maxAddresses = 5
 const noDestinations: Destination[] = []
 
@@ -25,6 +28,7 @@ export default function App() {
   const [homes, setHomes] = useState<Home[]>([])
   const [focus, setFocus] = useState(0)
   const [minutes, setMinutes] = useState(10)
+  const [openFilter, setOpenFilter] = useState<'category' | 'walk' | null>(null)
   const [category, setCategory] = useState<CategoryFilter>('all')
   const [editing, setEditing] = useState<number | null>(null)
   const [cluster, setCluster] = useState<Destination[] | null>(null)
@@ -175,8 +179,6 @@ export default function App() {
     setSelected(null)
   }
 
-  const CategoryIcon = categories[category].icon
-
   return (
     <div className={`app ${active ? 'has-results' : 'empty-map'} ${listOpen ? 'list-open' : ''}`}>
       <main className="workspace">
@@ -188,22 +190,12 @@ export default function App() {
             <AddressSearch index={index} disabled={!city || homes.length >= maxAddresses} onChoose={pickAddress}
               placeholder={homes.length >= maxAddresses ? 'Five addresses added' : active ? 'Add a San Francisco address' : 'Enter your first address'} />
             <div className="map-toolbar">
-            <label className="glass-select"><CategoryIcon size={17} style={{ color: categories[category].color }} aria-hidden="true" />
-              <select aria-label="Destination category" value={category} onChange={event => {
-                setCategory(event.target.value as CategoryFilter)
-                setSelected(null)
-                setCluster(null)
-              }}>
-                {Object.entries(categories).map(([value, entry]) => <option key={value} value={value}>{entry.label}</option>)}
-              </select><ChevronDown size={15} aria-hidden="true" /></label>
-            <label className="glass-select"><Footprints size={17} aria-hidden="true" />
-              <select aria-label="Maximum walking time" value={minutes} onChange={event => {
-                setMinutes(Number(event.target.value))
-                setSelected(null)
-                setCluster(null)
-              }}>
-                {walkLimits.map(limit => <option key={limit} value={limit}>{limit} min walk</option>)}
-              </select><ChevronDown size={15} aria-hidden="true" /></label>
+              <FilterMenu label="Destination category" value={category} options={categoryOptions}
+                open={openFilter === 'category'} onOpen={open => setOpenFilter(current => open ? 'category' : current === 'category' ? null : current)}
+                onChoose={value => { setCategory(value); setSelected(null); setCluster(null) }} />
+              <FilterMenu label="Maximum walking time" value={minutes} options={walkOptions}
+                open={openFilter === 'walk'} onOpen={open => setOpenFilter(current => open ? 'walk' : current === 'walk' ? null : current)}
+                onChoose={value => { setMinutes(value); setSelected(null); setCluster(null) }} />
             </div>
           </div>
           {editing !== null && homes[editing] && <div className="map-editor" role="dialog" aria-label="Edit address"

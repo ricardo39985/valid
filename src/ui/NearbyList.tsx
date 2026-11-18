@@ -76,7 +76,7 @@ export default function NearbyList({ items, selected, onSelect, showGroup, open,
     </div>}
     {!items.length ? <p className="status">No places found within this walk time.</p> :
       <div className="nearby-navigation">
-        {!showGroup && <section className="nearby-view category-view" aria-hidden={showDetails} inert={showDetails}>
+        {!showGroup && <section className="nearby-view category-view" data-shared-slide aria-hidden={showDetails} inert={showDetails}>
           <ul className="nearby-overview" aria-label="Nearby category overview">
             {[...groups].map(([category, places]) => {
               const entry = categories[category]
