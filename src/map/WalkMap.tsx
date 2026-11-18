@@ -6,7 +6,7 @@ import { loadBasemap } from '../assets/loadAssets'
 import type { Address, Coordinate, Destination, RouteSegment } from '../routing/types'
 import { categories, homeColors, letters } from '../ui/categories'
 import { addBasemap } from './basemap'
-import { enterMapFeature, prefersReducedMotion } from './motion'
+import { enterMapFeature, prefersReducedMotion, settle } from './motion'
 import { clusterPins } from './cluster'
 import PlaceCallout from './PlaceCallout'
 import { addRoutes, fadeRoutes } from './routeLayers'
@@ -39,6 +39,14 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
   const pins = useRef(new Map<Destination, Pin>())
   const frameDestinations = useRef(framing)
   useLayoutEffect(() => { frameDestinations.current = framing }, [framing])
+  const [sceneAddress, setSceneAddress] = useState(address)
+  const lastScene = useRef({ address, homeIndex, destinations, segments })
+  const currentScene = { address, homeIndex, destinations, segments }
+  const displayed = sceneAddress === address ? currentScene : lastScene.current
+  const sceneReady = sceneAddress === address
+  useLayoutEffect(() => {
+    if (sceneReady) lastScene.current = { address, homeIndex, destinations, segments }
+  }, [sceneReady, address, homeIndex, destinations, segments])
   const routes = useRef<ReturnType<typeof addRoutes> | null>(null)
   const cancelRouteExit = useRef<(() => void) | null>(null)
   const popup = useRef<L.Popup | null>(null)
@@ -63,8 +71,11 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
     }
     instance.attributionControl.setPrefix(false)
     instance.attributionControl.addAttribution('<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>')
-    instance.createPane('walk-outlines').style.zIndex = '405'
-    instance.createPane('walk-routes').style.zIndex = '406'
+    const outlinePane = instance.createPane('walk-outlines')
+    outlinePane.style.zIndex = '405'
+    const routePane = instance.createPane('walk-routes')
+    routePane.style.zIndex = '406'
+    for (const pane of [outlinePane, routePane, instance.getPane('markerPane')]) pane?.classList.add('scene-pane')
     instance.createPane('street-labels').style.zIndex = '440'
     const host = document.createElement('div')
     setPopupHost(host)
@@ -94,6 +105,9 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
     loadBasemap().then(data => {
       if (current) {
         addBasemap(instance, data)
+        if (!prefersReducedMotion()) instance.getPane('overlayPane')?.animate?.(
+          [{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: settle },
+        )
         setBaseError(false)
       }
     }).catch(error => {
@@ -110,8 +124,8 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
     if (!ready || !instance) return
     cancelRouteExit.current?.()
     if (routes.current) cancelRouteExit.current = fadeRoutes(routes.current)
-    routes.current = segments.length ? addRoutes(instance, segments) : null
-  }, [ready, segments])
+    routes.current = displayed.segments.length ? addRoutes(instance, displayed.segments) : null
+  }, [ready, displayed.segments])
 
   const fitAddress = useCallback(() => {
     const instance = map.current
@@ -131,33 +145,50 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
   }, [address])
 
   useLayoutEffect(() => {
-    if (!ready) return
+    const element = container.current
+    if (!ready || !element) return
     if (address) fitAddress()
-    else map.current?.setView(initialCenter, 12, { animate: false })
+    else map.current?.flyTo(initialCenter, 12, { animate: !prefersReducedMotion(), duration: .55 })
+
+    if (prefersReducedMotion()) {
+      setSceneAddress(address)
+      return
+    }
+
+    // Change map annotations while their panes are transparent, then reveal
+    // them in place as the camera approaches the new neighborhood.
+    element.classList.add('scene-out')
+    const replace = window.setTimeout(() => setSceneAddress(address), 170)
+    const reveal = window.setTimeout(() => element.classList.remove('scene-out'), address ? 480 : 250)
+    return () => {
+      window.clearTimeout(replace)
+      window.clearTimeout(reveal)
+      element.classList.remove('scene-out')
+    }
   }, [ready, address, fitAddress])
 
   useEffect(() => {
     const instance = map.current
-    if (!ready || !instance || !address) return
+    if (!ready || !instance || !displayed.address) return
     const building = document.createElement('div')
     building.className = 'home-marker'
-    building.style.setProperty('--pin', homeColors[homeIndex])
+    building.style.setProperty('--pin', homeColors[displayed.homeIndex])
     building.innerHTML = buildingIcon
     const letter = document.createElement('span')
-    letter.textContent = letters[homeIndex]
+    letter.textContent = letters[displayed.homeIndex]
     const label = document.createElement('span')
     label.className = 'home-map-label'
-    label.textContent = address[0]
+    label.textContent = displayed.address[0]
     building.append(letter, label)
-    building.setAttribute('aria-label', address[0])
+    building.setAttribute('aria-label', displayed.address[0])
     building.setAttribute('role', 'img')
-    const marker = L.marker(toLatLng(address[1]), {
+    const marker = L.marker(toLatLng(displayed.address[1]), {
       icon: L.divIcon({ className: 'marker-anchor', html: building, iconSize: [54, 53], iconAnchor: [27, 52] }),
       keyboard: false, interactive: false, zIndexOffset: 500,
     }).addTo(instance)
     enterMapFeature(building)
     return () => { marker.remove() }
-  }, [ready, address, homeIndex])
+  }, [ready, displayed.address, displayed.homeIndex])
 
   useEffect(() => {
     const instance = map.current
@@ -166,7 +197,7 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
     function renderPins() {
       if (!instance) return
       clusters.clearLayers()
-      const projected = clusterPins(destinations, item => instance.latLngToContainerPoint(toLatLng(item.place[2])))
+      const projected = clusterPins(displayed.destinations, item => instance.latLngToContainerPoint(toLatLng(item.place[2])))
       const singles = new Set(projected.filter(group => group.members.length === 1).map(group => group.members[0]))
       for (const [destination, pin] of pins.current) {
         if (singles.has(destination)) continue
@@ -222,7 +253,7 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
       instance.off('zoomend', renderPins)
       clusters.remove()
     }
-  }, [ready, destinations, selected, onSelect, onCluster])
+  }, [ready, displayed.destinations, selected, onSelect, onCluster])
 
   const refreshPopup = useCallback(() => popup.current?.update(), [])
   useLayoutEffect(() => {

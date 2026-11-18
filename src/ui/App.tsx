@@ -1,4 +1,4 @@
-import { Building2, ChevronDown, Footprints, List, MapPin, Pencil, Shuffle, X } from 'lucide-react'
+import { ChevronDown, Footprints, List, MapPin, Pencil, Shuffle, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { buildAddressIndex } from '../data'
 import { loadCity, type City } from '../assets/loadAssets'
@@ -8,7 +8,7 @@ import { createRouter, filterDestinations, routeSegments } from '../routing/walk
 import AddressSearch from './AddressSearch'
 import AddressFocusRing from './AddressFocusRing'
 import NearbyList from './NearbyList'
-import { prefersReducedMotion } from '../map/motion'
+import { prefersReducedMotion, settle } from '../map/motion'
 import { categories, homeColors, letters, sharedColor } from './categories'
 
 const walkLimits = [5, 10, 15, 20]
@@ -32,6 +32,25 @@ export default function App() {
   const [selected, setSelected] = useState<Destination | null>(null)
   const [message, setMessage] = useState('')
   const rail = useRef<HTMLDivElement>(null)
+
+  const sheet = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const element = sheet.current
+    if (!element) return
+    let previousTop = element.offsetTop
+    let animation: Animation | undefined
+    const observer = new ResizeObserver(() => {
+      const next = element.offsetTop
+      const delta = previousTop - next
+      previousTop = next
+      if (!delta || prefersReducedMotion() || !element.animate) return
+      animation?.cancel()
+      animation = element.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }],
+        { duration: 300, easing: settle })
+    })
+    observer.observe(element)
+    return () => { observer.disconnect(); animation?.cancel() }
+  }, [])
 
   useLayoutEffect(() => {
     const container = rail.current
@@ -154,21 +173,15 @@ export default function App() {
   const CategoryIcon = categories[category].icon
 
   return (
-    <div className={`app ${active ? 'has-results' : 'start'} ${listOpen ? 'list-open' : ''}`}>
-      <header className="topbar">
-        <div className="wordmark"><span><Building2 size={20} /></span>Before You Sign</div>
-        <div className="city-label">San Francisco<span> · </span><span className="city-region">California</span></div>
-
-      </header>
-
+    <div className={`app ${active ? 'has-results' : 'empty-map'} ${listOpen ? 'list-open' : ''}`}>
       <main className="workspace">
         <div className="map-region">
           <WalkMap address={active?.address} homeIndex={focus} segments={segments}
             destinations={mapDestinations} framing={destinations ?? noDestinations} selected={selected}
             onCluster={showCluster} onSelect={selectPlace} onClose={closePlace} />
-          {active && <div className="map-chrome">
+          <div className="map-chrome">
             <AddressSearch index={index} disabled={!city || homes.length >= maxAddresses} onChoose={pickAddress}
-              placeholder={homes.length >= maxAddresses ? 'Five addresses added' : 'Add a San Francisco address'} />
+              placeholder={homes.length >= maxAddresses ? 'Five addresses added' : active ? 'Add a San Francisco address' : 'Enter your first address'} />
             <div className="map-toolbar">
             <label className="glass-select"><CategoryIcon size={17} style={{ color: categories[category].color }} aria-hidden="true" />
               <select aria-label="Destination category" value={category} onChange={event => {
@@ -187,7 +200,7 @@ export default function App() {
                 {walkLimits.map(limit => <option key={limit} value={limit}>{limit} min walk</option>)}
               </select><ChevronDown size={15} aria-hidden="true" /></label>
             </div>
-          </div>}
+          </div>
           {editing !== null && homes[editing] && <div className="map-editor" role="dialog" aria-label="Edit address"
             onKeyDown={event => { if (event.key === 'Escape') { setEditing(null); setMessage('') } }}>
             <div className="editor-title"><strong>Edit {homes[editing].address[0]}</strong>
@@ -209,12 +222,9 @@ export default function App() {
 
         </div>
 
-        <aside className="board" aria-label={active ? 'Address comparison' : 'Find an address'}>
-          {!active ? <div className="intro">
-            <div className="intro-icon"><Footprints size={27} /></div>
-            <h1>What’s near your next home?</h1>
-            <p>See what you can walk to from any address on your San Francisco shortlist.</p>
-            <AddressSearch index={index} disabled={!city} onChoose={pickAddress} />
+        <aside className="board" ref={sheet} aria-label={active ? 'Address comparison' : 'Find an address'}>
+          {!active ? <div className="empty-board">
+            <h1>Enter your first address</h1>
             <button className="surprise" disabled={!city} onClick={surprise}><Shuffle size={17} />Surprise me</button>
             {!city && !error && <p className="status" role="status">Loading San Francisco addresses…</p>}
             {error && <div className="load-error" role="alert">The city data didn’t load. <button className="text-button" onClick={() => {

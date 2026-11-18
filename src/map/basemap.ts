@@ -1,4 +1,5 @@
 import * as L from 'leaflet'
+import { prefersReducedMotion, settle } from './motion'
 import type { LineString, MultiLineString } from 'geojson'
 import type { Basemap } from '../assets/loadAssets'
 
@@ -60,6 +61,8 @@ export function addBasemap(map: L.Map, data: Basemap) {
         icon: L.divIcon({ className: 'street-icon', html: label, iconSize: [0, 0] }),
         interactive: false, keyboard: false, pane: 'street-labels',
       }).addTo(labels)
+      if (!prefersReducedMotion()) label.animate?.([{ opacity: 0 }, { opacity: 1 }],
+        { duration: 240, easing: settle })
     }
   }
   map.on('moveend', updateLabels)
