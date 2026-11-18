@@ -5,7 +5,6 @@ import WalkMap from '../map/WalkMap'
 import type { Address, Category, CategoryFilter, Destination } from '../routing/types'
 import { createRouter, filterDestinations, routeSegments } from '../routing/walk'
 import AddressSearch from './AddressSearch'
-import AddressFocusRing from './AddressFocusRing'
 import Onboarding from './Onboarding'
 import SearchTools from './SearchTools'
 import { readPreference, savePreference } from './preferences'
@@ -55,7 +54,7 @@ export default function App() {
   const [listRevision, setListRevision] = useState(0)
   const [selected, setSelected] = useState<Destination | null>(null)
   const [message, setMessage] = useState('')
-  const rail = useRef<HTMLDivElement>(null)
+  const addressList = useRef<HTMLUListElement>(null)
 
   const listButton = useRef<HTMLButtonElement>(null)
   const nearbyPanel = useAnchoredPanel(listOpen, listButton)
@@ -67,6 +66,7 @@ export default function App() {
     let previousTop = element.offsetTop
     let animation: Animation | undefined
     const observer = new ResizeObserver(() => {
+      element.parentElement?.style.setProperty('--board-height', element.offsetHeight + 'px')
       const next = element.offsetTop
       const delta = previousTop - next
       previousTop = next
@@ -80,13 +80,13 @@ export default function App() {
   }, [])
 
   useLayoutEffect(() => {
-    const container = rail.current
-    const card = container?.querySelectorAll('.address-card-wrap')[focus]
-    if (!container || !card || container.scrollWidth <= container.clientWidth) return
-    const offset = card.getBoundingClientRect().left - container.getBoundingClientRect().left
-    if (offset < 0 || offset + card.clientWidth > container.clientWidth) {
-      container.scrollBy({ left: offset - 10, behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
-    }
+    const list = addressList.current
+    const row = list?.children[focus]
+    if (!list || !row || list.scrollHeight <= list.clientHeight) return
+    const bounds = list.getBoundingClientRect()
+    const entry = row.getBoundingClientRect()
+    const offset = entry.top < bounds.top ? entry.top - bounds.top : Math.max(0, entry.bottom - bounds.bottom)
+    if (offset) list.scrollBy({ top: offset, behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
   }, [focus, homes.length])
 
   const [loadComparison, setLoadComparison] = useState(false)
@@ -293,22 +293,21 @@ export default function App() {
                   }} />
               </div>
             </div>
-            <div className="address-rail" ref={rail}><div className={`address-cards ${homes.length === 1 ? 'single-card' : ''}`}
-              style={{ '--focus-color': homeColors[focus] } as React.CSSProperties}>
-              <AddressFocusRing activeIndex={focus} count={homes.length} editing={editing !== null} />
+            <ul className="shortlist" aria-label="Addresses to compare" ref={addressList}>
               {homes.map((home, i) => {
                 const results = nearby[i]
                 const isActive = focus === i
-                return <div className="address-card-wrap" key={home.address[0] + home.address[4]}>
-                  <button type="button" className="address-card" style={{ '--home': homeColors[i] } as React.CSSProperties}
-                    aria-pressed={isActive} onClick={() => focusAddress(i)}>
-                    <span className="address-label"><span className="letter">{letters[i]}</span><span>{home.address[0]}</span></span>
-                    <strong key={category + minutes} className="result-number">{category === 'all' ? results.length : results[0] ? `${results[0].minutes} min` : 'None'}</strong>
-                    <span className="address-metric">{category === 'all' ? (results.length === 1 ? 'place' : 'places') :
-                      results.length ? `${results.length} nearby` : 'within range'}</span>
-                    <span className="on-map">{isActive && <><MapPin size={12} />On map</>}</span>
+                return <li className="shortlist-row" key={home.address[0] + home.address[4]} style={{ '--home': homeColors[i] } as React.CSSProperties}>
+                  <button type="button" className="shortlist-address" aria-pressed={isActive} onClick={() => focusAddress(i)}>
+                    <span className="shortlist-letter">{letters[i]}</span>
+                    <span className="shortlist-name">{home.address[0]}
+                      {isActive && <small className="shortlist-current"><MapPin size={11} />On map</small>}
+                    </span>
+                    <span className="shortlist-metric"><strong className="result-number" key={category + minutes}>{category === 'all' ? results.length : results[0] ? `${results[0].minutes} min` : 'None'}</strong>
+                      <small>{category === 'all' ? (results.length === 1 ? 'place' : 'places') : results.length ? `${results.length} nearby` : 'within range'}</small>
+                    </span>
                   </button>
-                  <div className="card-actions">
+                  <div className="row-actions">
                     <button type="button" aria-label={`Edit ${home.address[0]}`} onClick={() => {
                       focusAddress(i)
                       setListOpen(false)
@@ -317,9 +316,9 @@ export default function App() {
                     }}><Pencil size={14} /></button>
                     <button type="button" aria-label={`Remove ${home.address[0]}`} onClick={() => removeAddress(i)}><X size={16} /></button>
                   </div>
-                </div>
+                </li>
               })}
-            </div></div>
+            </ul>
 
             {!destinations?.length && !listOpen && <p className="status">Nothing mapped within this walk time. Try a longer walk or another category.</p>}
             <p className="method-note">Estimated walking times · Overture Maps {city?.network.release}</p>
