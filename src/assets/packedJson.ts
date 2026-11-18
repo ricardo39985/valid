@@ -1,5 +1,5 @@
-export async function fetchPackedJson<T>(url: string): Promise<T> {
-  const response = await fetch(url)
+export async function fetchPackedJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(url, signal ? { signal } : undefined)
   if (!response.ok) throw new Error(`Could not load ${url} (HTTP ${response.status})`)
   const bytes = new Uint8Array(await response.arrayBuffer())
   // Some static hosts decompress files before the browser sees them.

@@ -1,6 +1,7 @@
 import { Footprints, List, MapPin, Pencil, Shuffle, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { loadCity, type City } from '../assets/loadAssets'
+import type { City } from '../assets/loadAssets'
+import { prepareCity } from '../assets/prepareCity'
 import WalkMap from '../map/WalkMap'
 import type { Address, Category, CategoryFilter, Destination } from '../routing/types'
 import { createRouter, filterDestinations, routeSegments } from '../routing/walk'
@@ -28,7 +29,7 @@ const noDestinations: Destination[] = []
 type Home = { address: Address; destinations: Destination[] }
 
 export default function App() {
-  const [launching, setLaunching] = useState(() => !prefersReducedMotion() && typeof Element.prototype.animate === 'function')
+  const [launching, setLaunching] = useState(true)
   const [tour, setTour] = useState(() => readPreference('tour') !== 'seen')
   const searchRow = useRef<HTMLDivElement>(null)
   function finishTour() {
@@ -43,7 +44,16 @@ export default function App() {
   const finishLaunch = useCallback(() => setLaunching(false), [])
   const [city, setCity] = useState<City | null>(null)
   const [attempt, setAttempt] = useState(0)
-  const [error, setError] = useState(false)
+  const [cityFailed, setCityFailed] = useState(false)
+  const [mapStartup, setMapStartup] = useState<'loading' | 'ready' | 'error'>('loading')
+  const startupReady = !!city && mapStartup === 'ready'
+  const startupFailed = cityFailed || mapStartup === 'error'
+  function retryStartup() {
+    setCity(null)
+    setCityFailed(false)
+    setMapStartup('loading')
+    setAttempt(value => value + 1)
+  }
   const [homes, setHomes] = useState<Home[]>([])
   const [focus, setFocus] = useState(0)
   const [minutes, setMinutes] = useState(10)
@@ -85,17 +95,24 @@ export default function App() {
     if (offset) list.scrollBy({ top: offset, behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
   }, [focus, homes.length])
 
-  const [loadComparison, setLoadComparison] = useState(false)
   useEffect(() => {
-    if (!launching && !tour) setLoadComparison(true)
-  }, [launching, tour])
-  useEffect(() => {
-    if (!loadComparison) return
-    let current = true
-    loadCity().then(data => { if (current) setCity(data) })
-      .catch(error => { if (current) { console.error(error); setError(true) } })
-    return () => { current = false }
-  }, [attempt, loadComparison])
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => {
+      controller.abort()
+      setCityFailed(true)
+    }, 30000)
+    prepareCity(controller.signal).then(data => {
+      if (!controller.signal.aborted) setCity(data)
+    }).catch(error => {
+      if (controller.signal.aborted) return
+      console.error(error)
+      setCityFailed(true)
+    }).finally(() => window.clearTimeout(timeout))
+    return () => {
+      window.clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [attempt])
 
   const index = city?.index ?? emptyIndex
   const walkFrom = useMemo(() => city && createRouter(city.network), [city])
@@ -237,13 +254,13 @@ export default function App() {
   return (
     <div className={`app ${active ? 'has-results' : 'empty-map'} ${listOpen ? 'list-open' : ''}`}>
       <main className="workspace" data-sheet-hidden={collapsed || undefined}>
-        <div className="map-region">
-          <WalkMap address={active?.address} homeIndex={focus} segments={segments}
+        <div className="map-region" inert={launching} aria-hidden={launching || undefined}>
+          <WalkMap key={attempt} onStartup={setMapStartup} address={active?.address} homeIndex={focus} segments={segments}
             destinations={mapDestinations} framing={destinations ?? noDestinations} selected={selected}
             onCluster={showCluster} onSelect={selectPlace} onClose={closePlace} />
           <div className="map-chrome">
             <div className="search-row" ref={searchRow}>
-              <AddressSearch index={index} loading={!city && !error} disabled={error || homes.length >= maxAddresses} onChoose={pickAddress}
+              <AddressSearch index={index} loading={!city} disabled={!city || homes.length >= maxAddresses} onChoose={pickAddress}
                 placeholder={homes.length >= maxAddresses ? 'Five addresses added' : active ? 'Add a San Francisco address' : 'Enter your first address'} />
               <SearchTools onTour={() => { setLaunching(false); setTour(true) }} />
             </div>
@@ -277,17 +294,12 @@ export default function App() {
 
         </div>
 
-        <aside className="board" ref={sheet} aria-label={active ? 'Address comparison' : 'Find an address'}>
+        <aside className="board" inert={launching} aria-hidden={launching || undefined} ref={sheet} aria-label={active ? 'Address comparison' : 'Find an address'}>
           <SheetHandle collapsed={collapsed} onChange={next => { setCollapsed(next); if (next) setListOpen(false) }} />
           <div id="sheet-content" inert={collapsed || !!removal}>
           {!active ? <div className="empty-board">
             <h1>Enter your first address</h1>
             <button className="surprise" disabled={!city} onClick={surprise}><Shuffle size={17} />Surprise me</button>
-            {!city && !error && <p className="status" role="status">Loading San Francisco addresses…</p>}
-            {error && <div className="load-error" role="alert">The city data didn’t load. <button className="text-button" onClick={() => {
-              setError(false)
-              setAttempt(value => value + 1)
-            }}>Try again</button></div>}
             {message && <p role="status" className="status">{message}</p>}
           </div> : <>
             <div className="board-heading">
@@ -351,14 +363,14 @@ export default function App() {
           </>}
           </div>
         </aside>
-        {launching && !tour && <LaunchScene onFinish={finishLaunch} />}
+        {launching && !tour && <LaunchScene ready={startupReady} failed={startupFailed} onRetry={retryStartup} onFinish={finishLaunch} />}
       </main>
       {removal && <RemoveAddressDialog address={removal[0]} onDismiss={() => {
         flushSync(() => setRemoval(null))
         const index = homes.findIndex(home => home.address === removal)
         addressList.current?.children[index]?.querySelector<HTMLButtonElement>('.row-actions button:last-child')?.focus({ preventScroll: true })
       }} onRemove={() => void removeAddress(removal)} />}
-      {tour && <Onboarding intro={launching} onIntroDone={finishLaunch} onDone={finishTour} />}
+      {tour && <Onboarding intro={launching} ready={startupReady} failed={startupFailed} onRetry={retryStartup} onIntroDone={finishLaunch} onDone={finishTour} />}
     </div>
   )
 }

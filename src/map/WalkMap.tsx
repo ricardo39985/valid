@@ -38,6 +38,7 @@ type Props = {
   destinations: Destination[]
   segments: RouteSegment[]
   framing: Destination[]
+  onStartup: (status: 'ready' | 'error') => void
   onCluster: (destinations: Destination[]) => void
   selected: Destination | null
   onSelect: (destination: Destination) => void
@@ -46,7 +47,7 @@ type Props = {
 
 type Pin = { button: HTMLButtonElement; marker: L.Marker }
 
-export default function WalkMap({ address, homeIndex, destinations, segments, framing, onCluster, selected, onSelect, onClose }: Props) {
+export default function WalkMap({ address, homeIndex, destinations, segments, framing, onStartup, onCluster, selected, onSelect, onClose }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const pins = useRef(new Map<Destination, Pin>())
@@ -62,15 +63,11 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
   useLayoutEffect(() => {
     if (sceneReady) lastScene.current = { address, homeIndex, destinations, segments }
   }, [sceneReady, address, homeIndex, destinations, segments])
-  const requestDetail = useRef<(() => void) | null>(null)
   const routes = useRef<ReturnType<typeof addRoutes> | null>(null)
   const cancelRouteExit = useRef<(() => void) | null>(null)
   const popup = useRef<L.Popup | null>(null)
   const [popupHost, setPopupHost] = useState<HTMLDivElement | null>(null)
   const [ready, setReady] = useState(false)
-  const [failed, setFailed] = useState(false)
-  const [attempt, setAttempt] = useState(0)
-  const [baseError, setBaseError] = useState(false)
 
   useLayoutEffect(() => {
     if (!container.current) return
@@ -82,7 +79,7 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
       })
     } catch (error) {
       console.error(error)
-      setFailed(true)
+      onStartup('error')
       return
     }
     showCity(instance)
@@ -118,41 +115,34 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
       routes.current = null
       pins.current.clear()
     }
-  }, [])
+  }, [onStartup])
 
   useEffect(() => {
     const instance = map.current
     if (!ready || !instance) return
     let current = true
-    let loadingDetail = false
-    function preloadDetail() {
-      if (!instance || loadingDetail) return
-      loadingDetail = true
-      loadBasemap().then(data => {
-        if (current) detailCleanup = addBasemap(instance, data)
-      }).catch(error => { if (current) { console.error(error); setBaseError(true) } })
-    }
     let region: L.Layer | undefined
     let detailCleanup: (() => void) | undefined
-    loadRegion().then(data => {
-      if (current) region = addRegion(instance, data)
-    }).catch(error => { if (current) { console.error(error); setBaseError(true) } })
-    setBaseError(false)
-    function detail() {
-      if (instance && instance.getZoom() >= 13 && instance.getBounds().intersects(cityBounds)) preloadDetail()
-    }
-    requestDetail.current = preloadDetail
-    if (currentAddress.current) preloadDetail()
-    else detail()
-    instance.on('moveend', detail)
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 30000)
+    Promise.all([loadRegion(controller.signal), loadBasemap(controller.signal)]).then(([overview, detail]) => {
+      if (!current) return
+      region = addRegion(instance, overview)
+      detailCleanup = addBasemap(instance, detail)
+      onStartup('ready')
+    }).catch(error => {
+      if (!current) return
+      console.error(error)
+      onStartup('error')
+    }).finally(() => window.clearTimeout(timeout))
     return () => {
       current = false
-      requestDetail.current = null
-      instance.off('moveend', detail)
+      window.clearTimeout(timeout)
+      controller.abort()
       region?.remove()
       detailCleanup?.()
     }
-  }, [attempt, ready])
+  }, [ready, onStartup])
 
   useEffect(() => {
     const instance = map.current
@@ -166,7 +156,6 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
   const fitAddress = useCallback(() => {
     const instance = map.current
     if (!address || !instance) return
-    requestDetail.current?.()
     if (endFlight.current) instance.off('moveend', endFlight.current)
     instance.stop().invalidateSize({ animate: false })
     const points = [toLatLng(address[1]), ...frameDestinations.current.map(item => toLatLng(item.place[2]))]
@@ -336,10 +325,6 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
       <div className="map-canvas" ref={container} />
       {selected && popupHost && <PlaceCallout key={selected.place.join('|')} destination={selected} host={popupHost}
         onClose={closeCallout} onLayout={refreshPopup} />}
-      {failed && <p className="map-message">The map couldn’t start. Walking times are available in the list.</p>}
-      {baseError && <div className="map-message" role="alert">The basemap didn’t load.
-        <button className="text-button" onClick={() => { setBaseError(false); setAttempt(value => value + 1) }}>Try again</button>
-      </div>}
       {ready && <div className="map-buttons">
         <button title="Zoom in" aria-label="Zoom in" onClick={() => map.current?.zoomIn(1, { animate: !prefersReducedMotion() })}><Plus size={18} /></button>
         <button title="Zoom out" aria-label="Zoom out" onClick={() => map.current?.zoomOut(1, { animate: !prefersReducedMotion() })}><Minus size={18} /></button>

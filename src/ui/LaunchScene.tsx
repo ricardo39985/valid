@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { Dumbbell } from 'lucide-react'
 import { categories } from './categories'
 import favicon from '/favicon.svg'
@@ -14,12 +14,36 @@ const branches = [
 const expandAt = 2230
 const expandDuration = 720
 
-export default function LaunchScene({ onFinish, tour = false }: { onFinish: () => void; tour?: boolean }) {
-  const scene = useRef<HTMLButtonElement>(null)
+export default function LaunchScene({ onFinish, ready, failed, onRetry, tour = false }: {
+  onFinish: () => void
+  ready: boolean
+  failed: boolean
+  onRetry: () => void
+  tour?: boolean
+}) {
+  const [skip, setSkip] = useState(false)
+  const [introDone, setIntroDone] = useState(false)
+  const [reduced, setReduced] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const staticSplash = reduced || typeof Element.prototype.animate !== 'function'
+  const scene = useRef<HTMLDivElement>(null)
   const matte = useRef<HTMLSpanElement>(null)
   const icon = useRef<HTMLImageElement>(null)
 
+  useEffect(() => {
+    const media = matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setReduced(media.matches)
+    media.addEventListener('change', update)
+    const timer = window.setTimeout(() => setIntroDone(true), expandAt)
+    return () => {
+      window.clearTimeout(timer)
+      media.removeEventListener('change', update)
+    }
+  }, [])
+
   useLayoutEffect(() => {
+    if (!ready || failed) return
+    if (skip || staticSplash) { onFinish(); return }
+    if (!introDone) return
     const layer = scene.current!
     const { width, height } = layer.getBoundingClientRect()
     const x = width / 2
@@ -33,7 +57,7 @@ export default function LaunchScene({ onFinish, tour = false }: { onFinish: () =
       const [left, right, top, bottom] = [x - size, x + size, y - size, y + size]
       return `path(evenodd, "M0 0H${width}V${height}H0Z M${left + r} ${top}H${right - r}Q${right} ${top} ${right} ${top + r}V${bottom - r}Q${right} ${bottom} ${right - r} ${bottom}H${left + r}Q${left} ${bottom} ${left} ${bottom - r}V${top + r}Q${left} ${top} ${left + r} ${top}Z")`
     }
-    const timing = { delay: expandAt, duration: expandDuration, easing: 'cubic-bezier(.6,0,.3,1)', fill: 'forwards' } as const
+    const timing = { duration: expandDuration, easing: 'cubic-bezier(.6,0,.3,1)', fill: 'forwards' } as const
     const reveal = matte.current!.animate([{ clipPath: aperture(half) }, { clipPath: aperture(edge) }], timing)
     const mark = icon.current!.animate([
       { scale: .925, opacity: 1 },
@@ -41,22 +65,17 @@ export default function LaunchScene({ onFinish, tour = false }: { onFinish: () =
       { scale: edge / half, opacity: 0 },
     ], timing)
     reveal.onfinish = onFinish
-    const preference = matchMedia('(prefers-reduced-motion: reduce)')
-    if (preference.matches) onFinish()
-    preference.addEventListener('change', onFinish)
     window.addEventListener('resize', onFinish)
     return () => {
       reveal.cancel()
       mark.cancel()
-      preference.removeEventListener('change', onFinish)
       window.removeEventListener('resize', onFinish)
     }
-  }, [onFinish])
+  }, [ready, failed, skip, staticSplash, introDone, onFinish])
 
-  return <button ref={scene} type="button" className="launch-scene" aria-label="Skip opening animation"
-    autoFocus={tour} onClick={onFinish}>
+  return <div ref={scene} className="launch-scene" data-static={staticSplash || skip || failed}>
     <span ref={matte} className="launch-matte" />
-    <svg className="launch-branches" viewBox="-219 -219 438 438" aria-hidden="true">
+    {!staticSplash && !skip && !failed && <svg className="launch-branches" viewBox="-219 -219 438 438" aria-hidden="true">
       {branches.map(({ label, icon: Icon, color, path, delay }) =>
         <g key={label} style={{ '--branch-delay': `${delay}ms`, '--branch-hue': color } as CSSProperties}>
           <g className="launch-route">
@@ -73,7 +92,15 @@ export default function LaunchScene({ onFinish, tour = false }: { onFinish: () =
             <text y="31" textAnchor="middle">{label}</text>
           </g>
         </g>)}
-    </svg>
+    </svg>}
     <img ref={icon} className="launch-icon" src={favicon} alt="" />
-  </button>
+    {failed ? <div className="launch-status">
+      <p role="alert">The map or address data couldn’t load.</p>
+      <button type="button" autoFocus className="text-button" onClick={onRetry}>Try again</button>
+    </div> : <>
+      {(introDone || staticSplash || skip) && !ready && <p className="launch-status" role="status">Preparing the San Francisco map…</p>}
+      {!staticSplash && !skip && <button type="button" className="launch-skip" autoFocus={tour}
+        aria-label="Skip opening animation" onClick={() => setSkip(true)} />}
+    </>}
+  </div>
 }

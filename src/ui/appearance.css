@@ -222,3 +222,11 @@
   53%, 73% { opacity: 1; translate: 0 0; }
   91%, 100% { opacity: 0; translate: 0 -2px; }
 }
+
+.launch-scene[data-static="true"] .launch-icon { animation: none; }
+.launch-skip { position: absolute; inset: 0; z-index: 2; border: 0; background: transparent; }
+.launch-skip:focus-visible { outline-offset: -4px; }
+.launch-status {
+  position: absolute; top: calc(50% + min(10vw, 7.25dvh, 40px) + 24px);
+  z-index: 3; padding: 0 16px; text-align: center; color: var(--muted);
+}

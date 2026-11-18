@@ -11,7 +11,14 @@ const steps = [
   { image: compare, title: 'Which apartment has the shorter walk?', body: 'Compare up to five addresses to see how long you’d walk from each one to the places you visit most.' },
 ]
 
-export default function Onboarding({ intro, onIntroDone, onDone }: { intro: boolean; onIntroDone: () => void; onDone: () => void }) {
+export default function Onboarding({ intro, ready, failed, onRetry, onIntroDone, onDone }: {
+  intro: boolean
+  ready: boolean
+  failed: boolean
+  onRetry: () => void
+  onIntroDone: () => void
+  onDone: () => void
+}) {
   const dialog = useRef<HTMLDialogElement>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
   const swipe = useRef<{ x: number; y: number } | null>(null)
@@ -42,9 +49,9 @@ export default function Onboarding({ intro, onIntroDone, onDone }: { intro: bool
       if (Math.abs(dx) < 36 || Math.abs(dx) < Math.abs(dy) * 1.5) return
       setPage(current => Math.max(0, Math.min(steps.length - 1, current + (dx < 0 ? 1 : -1))))
     }}
-    onCancel={e => { e.preventDefault(); if (intro) onIntroDone(); else finish() }}
+    onCancel={e => { e.preventDefault(); if (!intro) finish(); else if (ready) onIntroDone() }}
     onAnimationEnd={e => { if (closing && e.target === dialog.current && e.animationName === 'tour-exit') onDone() }}>
-    {intro && <LaunchScene tour onFinish={onIntroDone} />}
+    {intro && <LaunchScene tour ready={ready} failed={failed} onRetry={onRetry} onFinish={onIntroDone} />}
     <header inert={intro}><span className="tour-brand"><span><House size={19} /></span>Before You Sign</span>
       <button className="tour-close" ref={closeButton} onClick={finish} aria-label="Close tour"><X size={18} aria-hidden="true" /></button></header>
     <div className="tour-visual" aria-hidden="true"><div className="tour-track" style={{ transform: `translateX(-${page * 100}%)` }}>
