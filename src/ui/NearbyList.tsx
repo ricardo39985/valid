@@ -1,11 +1,13 @@
 import { ArrowLeft, ChevronRight, List, X } from 'lucide-react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import type { Category, Destination } from '../routing/types'
 import { prefersReducedMotion } from '../map/motion'
 import { categories } from './categories'
 import { captureSharedElements, carrySharedElements } from './panelMotion'
 
-export default function NearbyList({ items, selected, onSelect, showGroup, open, onClose, onClearGroup }: {
+export default function NearbyList({ focus, onFocusCategory, items, selected, onSelect, showGroup, open, onClose, onClearGroup }: {
+  focus: Category | null
+  onFocusCategory: (category: Category | null) => void
   items: Destination[]
   selected: Destination | null
   onSelect: (destination: Destination) => void
@@ -14,8 +16,7 @@ export default function NearbyList({ items, selected, onSelect, showGroup, open,
   onClose: () => void
   onClearGroup: () => void
 }) {
-  const [focus, setFocus] = useState<Category | null>(null)
-  const [drilledIn, setDrilledIn] = useState(false)
+  const drilledIn = focus !== null
   const showDetails = showGroup || drilledIn
   const back = useRef<HTMLButtonElement>(null)
   const header = useRef<HTMLDivElement>(null)
@@ -55,7 +56,8 @@ export default function NearbyList({ items, selected, onSelect, showGroup, open,
       {activeCategory && <button className="nearby-back icon-button" ref={back} aria-label="Back to nearby categories"
         onClick={() => {
           if (header.current && !prefersReducedMotion()) pending.current = captureSharedElements(header.current)
-          setDrilledIn(false)
+          selectedRow.current = header.current?.closest('.list-drawer')?.querySelector<HTMLButtonElement>(`[data-category="${focus}"]`) ?? null
+          onFocusCategory(null)
         }}><ArrowLeft size={18} /></button>}
       <div className="nearby-title" ref={header}>
         {activeCategory ? <>
@@ -81,11 +83,10 @@ export default function NearbyList({ items, selected, onSelect, showGroup, open,
             {[...groups].map(([category, places]) => {
               const entry = categories[category]
               const closest = places.reduce((minimum, { minutes }) => Math.min(minimum, minutes), Infinity)
-              return <li key={category}><button onClick={event => {
+              return <li key={category}><button data-category={category} onClick={event => {
                 selectedRow.current = event.currentTarget
                 if (!prefersReducedMotion()) pending.current = captureSharedElements(event.currentTarget)
-                setFocus(category)
-                setDrilledIn(true)
+                onFocusCategory(category)
               }}>
                 <span data-shared className="overview-icon" style={{ '--category': entry.color } as React.CSSProperties}><entry.icon size={17} /></span>
                 <span><strong data-shared>{entry.label}</strong><small>Closest · {closest} min</small></span>

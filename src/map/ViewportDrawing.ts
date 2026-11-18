@@ -1,4 +1,5 @@
 import * as L from 'leaflet'
+import { zoomPoint } from './zoomTransform'
 import type { CartoPaint } from './FlightPreview'
 
 // Paint settled detail into a screen-sized buffer. Its dimensions never grow
@@ -11,7 +12,7 @@ export default class ViewportDrawing extends L.Layer {
 
   constructor(private bounds: L.LatLngBounds, private paneName: string, private paints: CartoPaint[]) {
     super()
-    this.canvas.className = 'carto-surface'
+    this.canvas.className = 'carto-surface leaflet-zoom-animated'
     this.canvas.setAttribute('aria-hidden', 'true')
   }
 
@@ -29,7 +30,7 @@ export default class ViewportDrawing extends L.Layer {
     return this
   }
 
-  getEvents() { return { zoom: this.position, moveend: this.draw, viewreset: this.draw } }
+  getEvents() { return { zoomanim: this.position, zoom: this.position, moveend: this.draw, viewreset: this.draw } }
 
   private draw = () => {
     const map = this._map
@@ -65,10 +66,11 @@ export default class ViewportDrawing extends L.Layer {
     }
   }
 
-  private position() {
+  private position(event?: L.LeafletEvent) {
+    const target = event?.type === 'zoomanim' ? event as L.ZoomAnimEvent : undefined
     if (!this.corner) return
-    const point = this._map.latLngToLayerPoint(this.corner)
-    const scale = this._map.getZoomScale(this._map.getZoom(), this.paintedZoom)
+    const point = zoomPoint(this._map, this.corner, target)
+    const scale = this._map.getZoomScale(target?.zoom ?? this._map.getZoom(), this.paintedZoom)
     this.canvas.style.transform = `translate3d(${point.x}px,${point.y}px,0) scale(${scale})`
   }
 }

@@ -2,7 +2,7 @@ import { Footprints, List, MapPin, Pencil, Shuffle, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { loadCity, type City } from '../assets/loadAssets'
 import WalkMap from '../map/WalkMap'
-import type { Address, CategoryFilter, Destination } from '../routing/types'
+import type { Address, Category, CategoryFilter, Destination } from '../routing/types'
 import { createRouter, filterDestinations, routeSegments } from '../routing/walk'
 import AddressSearch from './AddressSearch'
 import AddressFocusRing from './AddressFocusRing'
@@ -46,7 +46,9 @@ export default function App() {
   const [focus, setFocus] = useState(0)
   const [minutes, setMinutes] = useState(10)
   const [openFilter, setOpenFilter] = useState<'category' | 'walk' | null>(null)
-  const [category, setCategory] = useState<CategoryFilter>('all')
+  const [toolbarCategory, setCategory] = useState<CategoryFilter>('all')
+  const [listCategory, setListCategory] = useState<Category | null>(null)
+  const category = listCategory ?? toolbarCategory
   const [editing, setEditing] = useState<number | null>(null)
   const [cluster, setCluster] = useState<Destination[] | null>(null)
   const [listOpen, setListOpen] = useState(false)
@@ -106,6 +108,9 @@ export default function App() {
   const nearby = useMemo(() => homes.map(home =>
     filterDestinations(home.destinations, category, minutes)), [homes, category, minutes])
   const destinations = nearby[focus]
+  const overview = useMemo(() => active
+    ? filterDestinations(active.destinations, toolbarCategory, minutes) : noDestinations,
+    [active, toolbarCategory, minutes])
   const mapDestinations = useMemo(() => selected ? [selected] : destinations ?? noDestinations, [selected, destinations])
   const segments = useMemo(() => active && city
     ? routeSegments(city.network, active.address, mapDestinations) : [], [active, city, mapDestinations])
@@ -219,7 +224,7 @@ export default function App() {
             <div className="map-toolbar">
               <FilterMenu label="Destination category" value={category} options={categoryOptions}
                 open={openFilter === 'category'} onOpen={open => setOpenFilter(current => open ? 'category' : current === 'category' ? null : current)}
-                onChoose={value => { setCategory(value); setSelected(null); setCluster(null) }} />
+                onChoose={value => { setCategory(value); setListCategory(null); setSelected(null); setCluster(null) }} />
               <FilterMenu label="Maximum walking time" value={minutes} options={walkOptions}
                 open={openFilter === 'walk'} onOpen={open => setOpenFilter(current => open ? 'walk' : current === 'walk' ? null : current)}
                 onChoose={value => { setMinutes(value); setSelected(null); setCluster(null) }} />
@@ -276,8 +281,10 @@ export default function App() {
                 if (event.key === 'Escape') { setListOpen(false); listButton.current?.focus({ preventScroll: true }) }
               }}>
               <div className="list-drawer-content">
-                <NearbyList key={active.address[0] + category + minutes + listRevision + (cluster ? cluster.map(item => item.place[0]).join() : "")}
-                  items={cluster ?? destinations ?? noDestinations} selected={selected} showGroup={!!cluster} open={listOpen}
+                <NearbyList key={active.address[0] + toolbarCategory + minutes + listRevision + (cluster ? cluster.map(item => item.place[0]).join() : "")}
+                  focus={cluster ? null : listCategory}
+                  onFocusCategory={value => { setListCategory(value); setSelected(null) }}
+                  items={cluster ?? overview} selected={selected} showGroup={!!cluster} open={listOpen}
                   onClose={() => { setListOpen(false); listButton.current?.focus({ preventScroll: true }) }}
                   onClearGroup={() => setCluster(null)}
                   onSelect={destination => {

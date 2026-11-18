@@ -1,4 +1,5 @@
 import * as L from 'leaflet'
+import { zoomPoint } from './zoomTransform'
 
 type Ink = { light: string; dark: string }
 export type CartoPaint = { path: Path2D; ink: Ink; stroke: boolean; width: number; bounds?: L.LatLngBounds }
@@ -22,7 +23,7 @@ export default class FlightPreview extends L.Layer {
     const ratio = 1536 / Math.max(size.x, size.y)
     this.canvas.width = Math.round(size.x * ratio)
     this.canvas.height = Math.round(size.y * ratio)
-    this.canvas.className = 'flight-preview'
+    this.canvas.className = 'flight-preview leaflet-zoom-animated'
     this.canvas.setAttribute('aria-hidden', 'true')
   }
 
@@ -60,11 +61,12 @@ export default class FlightPreview extends L.Layer {
     return this
   }
 
-  getEvents() { return { zoom: this.position, viewreset: this.position } }
+  getEvents() { return { zoomanim: this.position, zoom: this.position, viewreset: this.position } }
 
-  private position() {
-    const origin = this._map.latLngToLayerPoint(this.northWest)
-    const scale = this._map.getZoomScale(this._map.getZoom(), 18) * this.widthAt18 / this.canvas.width
+  private position(event?: L.LeafletEvent) {
+    const target = event?.type === 'zoomanim' ? event as L.ZoomAnimEvent : undefined
+    const origin = zoomPoint(this._map, this.northWest, target)
+    const scale = this._map.getZoomScale(target?.zoom ?? this._map.getZoom(), 18) * this.widthAt18 / this.canvas.width
     this.canvas.style.transform = `translate3d(${origin.x}px,${origin.y}px,0) scale(${scale})`
   }
 }
