@@ -1,14 +1,21 @@
 import { X } from 'lucide-react'
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, type MouseEvent } from 'react'
 import { prefersReducedMotion, settle } from '../map/motion'
 import { animateAnchoredSurface } from './panelMotion'
 
 type Props = { address: string; trigger: HTMLButtonElement; onDismiss: () => void; onRemove: () => void }
 
+function isBackdrop(event: MouseEvent<HTMLDialogElement>) {
+  if (event.target !== event.currentTarget) return false
+  const { left, right, top, bottom } = event.currentTarget.getBoundingClientRect()
+  return event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom
+}
+
 export default function RemoveAddressDialog({ address, trigger, onDismiss, onRemove }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   const opening = useRef<Animation[]>([])
   const closing = useRef(false)
+  const startedOnBackdrop = useRef(false)
 
   useLayoutEffect(() => {
     const dialog = ref.current!
@@ -53,14 +60,25 @@ export default function RemoveAddressDialog({ address, trigger, onDismiss, onRem
   }
 
   return <dialog className="remove-dialog" ref={ref} aria-labelledby="remove-title" aria-describedby="remove-detail"
-    onCancel={event => { event.preventDefault(); void finish(false) }}>
+    onCancel={event => { event.preventDefault(); void finish(false) }}
+    onPointerDown={event => { startedOnBackdrop.current = event.button === 0 && isBackdrop(event) }}
+    onPointerCancel={() => { startedOnBackdrop.current = false }}
+    onClick={event => {
+      const dismiss = startedOnBackdrop.current && isBackdrop(event)
+      startedOnBackdrop.current = false
+      if (dismiss) void finish(false)
+    }}>
     <div>
-      <span className="remove-icon" aria-hidden="true"><X size={20} /></span>
-      <h2 id="remove-title">Remove {address}?</h2>
+      <div className="remove-header">
+        <h2 id="remove-title">Remove {address}?</h2>
+        <button type="button" className="remove-close" aria-label="Close" onClick={() => void finish(false)}>
+          <X size={18} aria-hidden="true" />
+        </button>
+      </div>
       <p id="remove-detail">This address will be removed from your comparison.</p>
       <div className="remove-actions">
         <button type="button" autoFocus onClick={() => void finish(false)}>Cancel</button>
-        <button type="button" className="confirm-remove" onClick={() => void finish(true)}>Remove address</button>
+        <button type="button" className="confirm-remove" onClick={() => void finish(true)}>Remove</button>
       </div>
     </div>
   </dialog>

@@ -164,11 +164,13 @@
 @starting-style { .remove-dialog[open]::backdrop { opacity: 0; } }
 .remove-dialog[data-closing] { pointer-events: none; }
 .remove-dialog[data-closing]::backdrop { opacity: 0; }
-.remove-icon {
-  display: grid; place-items: center; width: 42px; height: 42px; margin-bottom: 12px;
+.remove-header { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: start; gap: 12px; }
+.remove-close {
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0;
   border-radius: 14px; color: var(--accent); background: var(--tint);
 }
-.remove-dialog h2 { margin: 0; font-size: 21px; letter-spacing: -.035em; overflow-wrap: anywhere; }
+.remove-close:hover { background: color-mix(in srgb, var(--tint) 85%, var(--accent)); }
+.remove-dialog h2 { margin: 0; padding-top: 9px; font-size: 21px; letter-spacing: -.035em; overflow-wrap: anywhere; }
 .remove-dialog p { margin: 8px 0 20px; color: var(--muted); line-height: 1.45; }
 .remove-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .remove-actions button {
