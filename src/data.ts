@@ -1,23 +1,4 @@
-import type { Address, Network } from './routing/types'
-
-async function readCompressed<T>(name: string): Promise<T> {
-  const response = await fetch(new URL(`data/${name}.json.gz`, document.baseURI))
-  if (!response.ok || !response.body) throw new Error(`Could not load ${name}`)
-  const stream = response.body.pipeThrough(new DecompressionStream('gzip'))
-  return new Response(stream).json() as Promise<T>
-}
-
-export async function loadCity() {
-  const [addresses, network] = await Promise.all([
-    readCompressed<Address[]>('addresses'), readCompressed<Network>('network'),
-  ])
-  for (const address of addresses) {
-    address[0] = address[0].replace(/\b(\d+)(St|Nd|Rd|Th)\b/g, (_, number, ordinal) => number + ordinal.toLowerCase())
-  }
-  return { addresses, network }
-}
-
-export type City = Awaited<ReturnType<typeof loadCity>>
+import type { Address } from './routing/types'
 
 const suffixes: Record<string, string> = {
   street: 'st', avenue: 'ave', boulevard: 'blvd', road: 'rd',

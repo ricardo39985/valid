@@ -1,6 +1,7 @@
 import { Building2, ChevronDown, Footprints, List, Plus, Shuffle, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { buildAddressIndex, loadCity, type City } from '../data'
+import { buildAddressIndex } from '../data'
+import { loadCity, type City } from '../assets/loadAssets'
 import WalkMap from '../map/WalkMap'
 import type { Address, CategoryFilter, Destination } from '../routing/types'
 import { createRouter, filterDestinations, routeSegments } from '../routing/walk'
@@ -28,7 +29,7 @@ export default function App() {
   useEffect(() => {
     let current = true
     loadCity().then(data => { if (current) setCity(data) })
-      .catch(() => { if (current) setError(true) })
+      .catch(error => { if (current) { console.error(error); setError(true) } })
     return () => { current = false }
   }, [attempt])
 

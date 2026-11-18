@@ -15,12 +15,12 @@ npm test
 npm run build
 ```
 
-The production build is in `dist/`. Both city files ship with the repo, so running the app doesn't require data credentials or a separate server.
+The production build is in `dist/`. The city dataset and basemap ship with the repo. Running the app needs a static file server and no data credentials.
 
 ## How it fits together
 
 - `src/ui/` contains address entry, filters, and the comparison panel.
-- `src/map/` draws the destinations and routes in MapLibre.
+- `src/map/` draws the local basemap, destinations, and routes in Leaflet.
 - `src/routing/` finds reachable destinations and groups shared paths. A shared street segment gets one color, then the branches take the colors of the places they lead to.
 - `scripts/` extracts and prepares the Overture data.
 
@@ -30,9 +30,9 @@ The app uses Overture's **2026-10-21.0** release for street addresses, destinati
 
 Walking estimates assume 80 meters per minute. Addresses and destinations snap to nearby graph connectors, and the estimate includes the distance to those connectors. The straight approaches are approximate. The app excludes roads outside its pedestrian class allowlist and applies mapped foot access denials. It doesn't model hills, crossing delays, closures, or step-free access. Transit results show mapped stops and stations. Service and schedules are outside scope.
 
-I kept the first city to San Francisco and the shortlist to five addresses. The map shows one address's routes at a time, while the other results stay in the comparison panel. There are no accounts, listings, overall scores, or live business hours. The roughly 5 MB compressed city extract keeps hosting simple. The basemap is loaded from OpenFreeMap.
+I kept the first city to San Francisco and the shortlist to five addresses. The map shows one address's routes at a time, while the other results stay in the comparison panel. There are no accounts, listings, overall scores, or live business hours. The city extract includes a simplified basemap derived from Overture streets, coastline, parks, and water. The static app has no runtime tile service or WebGL requirement.
 
-To rebuild the two city files with Python 3.12 or newer:
+To rebuild the city and basemap files with Python 3.12 or newer:
 
 ```sh
 python -m venv .venv
@@ -41,4 +41,4 @@ pip install -r scripts/requirements.txt
 scripts/extract.sh
 ```
 
-Map and routing data © OpenStreetMap contributors and Overture Maps Foundation. The derived walking network is distributed under the [Open Database License](https://opendatacommons.org/licenses/odbl/1-0/). Address and place data retain their [Overture source terms](https://docs.overturemaps.org/attribution/).
+Map and routing data © OpenStreetMap contributors and Overture Maps Foundation. The derived walking network and basemap are distributed under the [Open Database License](https://opendatacommons.org/licenses/odbl/1-0/). Address and place data retain their [Overture source terms](https://docs.overturemaps.org/attribution/).

@@ -174,10 +174,10 @@ def main(directory, output, release):
     destinations = places(directory, snap)
     home_addresses = addresses(directory, snap)
     output.mkdir(parents=True, exist_ok=True)
-    write_gzip(output / "network.json.gz", {
+    write_gzip(output / "network.pack", {
         "release": release, "nodes": nodes, "edges": edges, "places": destinations,
     })
-    write_gzip(output / "addresses.json.gz", home_addresses)
+    write_gzip(output / "addresses.pack", home_addresses)
     print(f"{len(home_addresses):,} addresses, {len(nodes):,} connectors, {len(edges):,} walking edges")
     print(dict(Counter(item[1] for item in destinations)))
 
