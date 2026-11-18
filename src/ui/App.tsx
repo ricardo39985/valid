@@ -8,6 +8,7 @@ import { createRouter, filterDestinations, routeSegments } from '../routing/walk
 import AddressSearch from './AddressSearch'
 import AddressFocusRing from './AddressFocusRing'
 import NearbyList from './NearbyList'
+import { useAnchoredPanel } from './panelMotion'
 import { prefersReducedMotion, settle } from '../map/motion'
 import { categories, homeColors, letters, sharedColor } from './categories'
 
@@ -32,6 +33,9 @@ export default function App() {
   const [selected, setSelected] = useState<Destination | null>(null)
   const [message, setMessage] = useState('')
   const rail = useRef<HTMLDivElement>(null)
+
+  const listButton = useRef<HTMLButtonElement>(null)
+  const nearbyPanel = useAnchoredPanel(listOpen, listButton)
 
   const sheet = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
@@ -157,6 +161,7 @@ export default function App() {
   }
 
   function removeAddress(at: number) {
+    if (homes.length === 1) setListOpen(false)
     setEditing(null)
     setCluster(null)
     setHomes(homes.filter((_, index) => index !== at))
@@ -240,27 +245,25 @@ export default function App() {
                 {homes.length > 1 && <p className="comparison-label">Compare {homes.length} addresses</p>}
                 <h1 key={active.address[0] + category} className="focus-heading">{category === 'all' ? active.address[0] : `${categories[category].label} near ${active.address[0]}`}</h1>
               </div>
-              <button className="subtle-button" aria-expanded={listOpen} aria-controls="nearby-panel"
+              <button ref={listButton} className="subtle-button nearby-trigger" aria-expanded={listOpen} aria-controls="nearby-panel"
                 onClick={toggleList}>
-                <List size={17} />{listOpen ? 'Hide list' : 'List'}
+                <List size={17} />List
               </button>
             </div>
 
-            <div id="nearby-panel" className="list-drawer" aria-hidden={!listOpen} inert={!listOpen}>
+            <div id="nearby-panel" ref={nearbyPanel} className="list-drawer" aria-hidden={!listOpen} inert={!listOpen}
+              onKeyDown={event => {
+                if (event.key === 'Escape') { setListOpen(false); listButton.current?.focus({ preventScroll: true }) }
+              }}>
               <div className="list-drawer-content">
-                <div className="nearby-panel-heading">
-                  <strong>Nearby places</strong>
-                  <button className="icon-button" aria-label="Close nearby places" onClick={() => setListOpen(false)}><X size={17} /></button>
-                </div>
-                {cluster && <div className="cluster-list-heading">
-                  <strong>{cluster.length} places in this group</strong>
-                  <button className="text-button" onClick={() => setCluster(null)}>View all places</button>
-                </div>}
                 <NearbyList key={active.address[0] + category + minutes + listRevision + (cluster ? cluster.map(item => item.place[0]).join() : "")}
-                  items={cluster ?? destinations ?? noDestinations} selected={selected} showGroup={!!cluster} onSelect={destination => {
-                  selectPlace(destination)
-                  if (window.matchMedia('(max-width: 860px)').matches) setListOpen(false)
-                }} />
+                  items={cluster ?? destinations ?? noDestinations} selected={selected} showGroup={!!cluster} open={listOpen}
+                  onClose={() => { setListOpen(false); listButton.current?.focus({ preventScroll: true }) }}
+                  onClearGroup={() => setCluster(null)}
+                  onSelect={destination => {
+                    selectPlace(destination)
+                    if (window.matchMedia('(max-width: 860px)').matches) setListOpen(false)
+                  }} />
               </div>
             </div>
             <div className="address-rail" ref={rail}><div className={`address-cards ${homes.length === 1 ? 'single-card' : ''}`}
