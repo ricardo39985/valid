@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight, House, X } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
-import launch from '../assets/launch.webp'
+import LaunchScene from './LaunchScene'
 import walk from '../assets/tour/walk.webp'
 import filter from '../assets/tour/filter.webp'
 import compare from '../assets/tour/compare.webp'
@@ -13,6 +13,7 @@ const steps = [
 
 export default function Onboarding({ intro, onIntroDone, onDone }: { intro: boolean; onIntroDone: () => void; onDone: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
   const swipe = useRef<{ x: number; y: number } | null>(null)
   const [page, setPage] = useState(0)
   const [closing, setClosing] = useState(false)
@@ -21,6 +22,9 @@ export default function Onboarding({ intro, onIntroDone, onDone }: { intro: bool
     element.showModal()
     return () => element.close()
   }, [])
+  useLayoutEffect(() => {
+    if (!intro) closeButton.current?.focus({ preventScroll: true })
+  }, [intro])
   const finish = () => setClosing(true)
   return <dialog ref={dialog} className="tour" data-closing={closing} data-intro={intro} aria-labelledby="tour-title"
     onTouchStart={e => {
@@ -40,12 +44,9 @@ export default function Onboarding({ intro, onIntroDone, onDone }: { intro: bool
     }}
     onCancel={e => { e.preventDefault(); if (intro) onIntroDone(); else finish() }}
     onAnimationEnd={e => { if (closing && e.target === dialog.current && e.animationName === 'tour-exit') onDone() }}>
-    {intro && <button className="tour-launch" aria-label="Skip opening animation" autoFocus onClick={onIntroDone}
-      onAnimationEnd={e => { if (e.target === e.currentTarget) onIntroDone() }}>
-      <span><img src={launch} alt="" /><b>610 20th St</b></span>
-    </button>}
+    {intro && <LaunchScene tour onFinish={onIntroDone} />}
     <header inert={intro}><span className="tour-brand"><span><House size={19} /></span>Before You Sign</span>
-      <button className="tour-close" autoFocus={!intro} onClick={finish} aria-label="Close tour"><X size={18} aria-hidden="true" /></button></header>
+      <button className="tour-close" ref={closeButton} onClick={finish} aria-label="Close tour"><X size={18} aria-hidden="true" /></button></header>
     <div className="tour-visual" aria-hidden="true"><div className="tour-track" style={{ transform: `translateX(-${page * 100}%)` }}>
       {steps.map(step => <img key={step.image} src={step.image} alt="" />)}
     </div></div>

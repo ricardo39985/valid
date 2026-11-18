@@ -93,7 +93,6 @@
   --map-land: #272b36; --map-green: #2b403a; --map-water: #1b2c43; --map-road: #434958; --map-artery: #655e5c;
 }
 [data-theme="dark"] .map-canvas.leaflet-container { background: var(--map-water); }
-[data-theme="dark"] .launch-scene { background: radial-gradient(ellipse at 50% 38%, #2c2c2e, #141416); }
 [data-theme="dark"] .street-label { background: #272b36b8; color: #cdc9d5; text-shadow: none; }
 [data-theme="dark"] :is(.map-editor,.filter-popover,.list-drawer,.map-message,.place-callout,.place-callout::after,.search-popover,.search-popover button,.subtle-button,.app .board) { background: var(--tour-bg); color: var(--ink); border-color: var(--line); }
 [data-theme="dark"] :is(.map-chrome .search-field,.glass-select,.map-buttons,.map-legend,.home-map-label,.leaflet-control-attribution,.overture-credit) { background: var(--glass); color: var(--ink); border-color: var(--line); box-shadow: var(--shadow-glass); }
@@ -108,13 +107,6 @@
 
 /* The first tour page is already beneath the splash as its illustration recedes. */
 .tour[open][data-intro="true"] { animation: none; }
-.tour-launch { position: fixed; inset: 0; width: 100%; height: 100%; display: grid; place-items: center; z-index: 2; border: 0; background: radial-gradient(ellipse at 50% 38%, #fcfbff, #eeedf9); animation: intro-handoff 1670ms both; }
-.tour-launch > span { position: relative; display: block; width: min(438px, 96vw, 75dvh); }
-.tour-launch img { width: 100%; display: block; }
-.tour-launch b { position: absolute; top: 35%; left: 50%; transform: translate(-50%,-50%); padding: 6px 12px; border-radius: 20px; font-size: 12px; background: var(--tour-bg); color: var(--ink); box-shadow: var(--shadow-glass); }
-[data-theme="dark"] .tour-launch { background: radial-gradient(ellipse at 50% 38%, #2c2c2e, #141416); }
-@keyframes intro-handoff { 0%, 72% { opacity: 1; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .tour-launch { animation-duration: 1ms; } }
 .search-tools, .project-menu:not([inert]) { pointer-events: auto; }
 
 .menu-appearance { padding: 8px 8px 12px; margin-bottom: 5px; border-bottom: 1px solid var(--line); }
@@ -176,3 +168,55 @@
 @media (prefers-reduced-motion: reduce) { .remove-dialog, .remove-dialog::backdrop { animation-duration: 60ms; } }
 
 .remove-dialog[data-closing]::backdrop { opacity: 0; transition: opacity 140ms ease-out; }
+
+.launch-scene {
+  position: fixed; inset: 0; z-index: 650; display: grid; place-items: center;
+  width: 100%; height: 100%; padding: 0; border: 0; background: transparent;
+}
+.launch-matte {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 45% 42%, #fdfcff, #eeedf9);
+}
+[data-theme="dark"] .launch-matte { background: radial-gradient(ellipse at 45% 42%, #272332, #15131b); }
+.launch-branches, .launch-icon { grid-area: 1 / 1; z-index: 1; pointer-events: none; }
+.launch-branches { width: min(100vw, 72dvh, 438px); overflow: visible; }
+.launch-icon { width: min(20vw, 14.5dvh, 80px); animation: launch-icon-in 2230ms both; }
+.launch-route path {
+  fill: none; stroke: color-mix(in srgb, #977fd5 82%, var(--branch-hue));
+  stroke-width: 1.65; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: launch-route 2230ms cubic-bezier(.4,0,.3,1) both;
+  animation-delay: var(--branch-delay);
+}
+.launch-route path:first-child { stroke: var(--tour-bg); stroke-width: 3.8; }
+.launch-pulse {
+  fill: none; stroke: #805bd5; stroke-width: 2.8; stroke-linecap: round;
+  stroke-dasharray: .12 1; opacity: 0;
+  animation: launch-pulse 740ms linear both;
+  animation-delay: calc(735ms + var(--branch-delay));
+}
+.launch-marker { animation: launch-marker 2230ms both; animation-delay: var(--branch-delay); }
+.launch-marker circle { fill: color-mix(in srgb, var(--branch-hue) 17%, var(--tour-bg)); stroke: var(--tour-bg); stroke-width: 2px; }
+.launch-marker svg { color: color-mix(in srgb, var(--branch-hue) 82%, var(--ink)); }
+.launch-marker text { fill: var(--ink); font-size: 11px; font-weight: 650; }
+@keyframes launch-icon-in {
+  0% { scale: .88; opacity: 0; }
+  14% { opacity: 1; }
+  28% { scale: 1.05; }
+  76% { scale: 1; }
+  100% { scale: .925; opacity: 1; }
+}
+@keyframes launch-route {
+  0%, 13% { stroke-dashoffset: 1; }
+  49%, 71% { stroke-dashoffset: 0; }
+  93%, 100% { stroke-dashoffset: 1; }
+}
+@keyframes launch-pulse {
+  from { stroke-dashoffset: .12; opacity: 0; }
+  15%, 70% { opacity: .9; }
+  to { stroke-dashoffset: -1; opacity: 0; }
+}
+@keyframes launch-marker {
+  0%, 42% { opacity: 0; translate: 0 4px; }
+  53%, 73% { opacity: 1; translate: 0 0; }
+  91%, 100% { opacity: 0; translate: 0 -2px; }
+}

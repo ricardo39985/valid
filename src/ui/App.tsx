@@ -237,12 +237,11 @@ export default function App() {
 
   return (
     <div className={`app ${active ? 'has-results' : 'empty-map'} ${listOpen ? 'list-open' : ''}`}>
-      <main className="workspace" data-sheet-hidden={collapsed || undefined} data-launching={launching && !tour || undefined}>
+      <main className="workspace" data-sheet-hidden={collapsed || undefined}>
         <div className="map-region">
           <WalkMap savedLocations={savedLocations} address={active?.address} homeIndex={focus} segments={segments}
             destinations={mapDestinations} framing={destinations ?? noDestinations} selected={selected}
             onCluster={showCluster} onSelect={selectPlace} onClose={closePlace} />
-          {launching && !tour && <LaunchScene onFinish={finishLaunch} />}
           <div className="map-chrome">
             <div className="search-row" ref={searchRow}>
               <AddressSearch index={index} loading={!city && !error} disabled={error || homes.length >= maxAddresses} onChoose={pickAddress}
@@ -353,6 +352,7 @@ export default function App() {
           </>}
           </div>
         </aside>
+        {launching && !tour && <LaunchScene onFinish={finishLaunch} />}
       </main>
       {removal && <RemoveAddressDialog address={removal[0]} onDismiss={() => {
         flushSync(() => setRemoval(null))
