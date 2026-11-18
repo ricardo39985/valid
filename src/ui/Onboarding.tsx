@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, House } from 'lucide-react'
+import { ArrowLeft, ArrowRight, House, X } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import launch from '../assets/launch.webp'
 import walk from '../assets/tour/walk.webp'
@@ -6,13 +6,14 @@ import filter from '../assets/tour/filter.webp'
 import compare from '../assets/tour/compare.webp'
 
 const steps = [
-  { image: walk, title: 'Before you sign the lease.', body: 'You’ve seen the apartment. What’s around it? Start with a San Francisco address to see what you could walk to from home.' },
-  { image: filter, title: 'Picture a Tuesday there.', body: 'Could you pick up groceries on foot or catch a nearby bus? Choose how far you’d walk and see which everyday stops are within reach.' },
-  { image: compare, title: 'Which apartment fits your day?', body: 'Compare up to five addresses. See which puts the places you use most within an easy walk.' },
+  { image: walk, title: 'What’s within walking distance?', body: 'Before you sign the lease, enter the apartment’s San Francisco address to see what you can walk to from your front door.' },
+  { image: filter, title: 'Groceries within ten minutes?', body: 'Choose Groceries and a 10-minute walk to see which stores are close enough to reach on foot.' },
+  { image: compare, title: 'Which apartment has the shorter walk?', body: 'Compare up to five addresses to see how long you’d walk from each one to the places you visit most.' },
 ]
 
 export default function Onboarding({ intro, onIntroDone, onDone }: { intro: boolean; onIntroDone: () => void; onDone: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null)
+  const swipe = useRef<{ x: number; y: number } | null>(null)
   const [page, setPage] = useState(0)
   const [closing, setClosing] = useState(false)
   useLayoutEffect(() => {
@@ -22,6 +23,21 @@ export default function Onboarding({ intro, onIntroDone, onDone }: { intro: bool
   }, [])
   const finish = () => setClosing(true)
   return <dialog ref={dialog} className="tour" data-closing={closing} data-intro={intro} aria-labelledby="tour-title"
+    onTouchStart={e => {
+      const interactive = (e.target as Element).closest('button')
+      swipe.current = !intro && !closing && !interactive && e.touches.length === 1
+        ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null
+    }}
+    onTouchCancel={() => { swipe.current = null }}
+    onTouchEnd={e => {
+      const start = swipe.current
+      swipe.current = null
+      if (!start || e.touches.length || !e.changedTouches.length) return
+      const dx = e.changedTouches[0].clientX - start.x
+      const dy = e.changedTouches[0].clientY - start.y
+      if (Math.abs(dx) < 36 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+      setPage(current => Math.max(0, Math.min(steps.length - 1, current + (dx < 0 ? 1 : -1))))
+    }}
     onCancel={e => { e.preventDefault(); if (intro) onIntroDone(); else finish() }}
     onAnimationEnd={e => { if (closing && e.target === dialog.current && e.animationName === 'tour-exit') onDone() }}>
     {intro && <button className="tour-launch" aria-label="Skip opening animation" autoFocus onClick={onIntroDone}
@@ -29,7 +45,7 @@ export default function Onboarding({ intro, onIntroDone, onDone }: { intro: bool
       <span><img src={launch} alt="" /><b>610 20th St</b></span>
     </button>}
     <header inert={intro}><span className="tour-brand"><span><House size={19} /></span>Before You Sign</span>
-      <button autoFocus={!intro} onClick={finish}>Skip</button></header>
+      <button className="tour-close" autoFocus={!intro} onClick={finish} aria-label="Close tour"><X size={18} aria-hidden="true" /></button></header>
     <div className="tour-visual" aria-hidden="true"><div className="tour-track" style={{ transform: `translateX(-${page * 100}%)` }}>
       {steps.map(step => <img key={step.image} src={step.image} alt="" />)}
     </div></div>

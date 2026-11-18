@@ -141,3 +141,6 @@
   to { clip-path: circle(var(--reveal-radius) at var(--reveal-origin)); }
 }
 @media (prefers-reduced-motion: reduce) { .appearance-thumb,.project-menu .auto-mode { transition: none; } }
+
+.tour { touch-action: pan-y pinch-zoom; }
+.tour header .tour-close { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; color: var(--muted); background: color-mix(in srgb, var(--muted) 9%, transparent); }
