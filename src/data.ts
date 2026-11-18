@@ -1,5 +1,7 @@
 import type { Address } from './routing/types'
 
+const addressOrder = new Intl.Collator('en', { numeric: true })
+
 const suffixes: Record<string, string> = {
   street: 'st', avenue: 'ave', boulevard: 'blvd', road: 'rd',
   drive: 'dr', lane: 'ln', court: 'ct', place: 'pl', terrace: 'ter',
@@ -33,6 +35,6 @@ export function searchAddresses(index: ReturnType<typeof buildAddressIndex>, que
       matches.push({ address, rank })
     }
   }
-  return matches.sort((a, b) => a.rank - b.rank || a.address[0].localeCompare(b.address[0], 'en', { numeric: true }))
+  return matches.sort((a, b) => a.rank - b.rank || addressOrder.compare(a.address[0], b.address[0]))
     .slice(0, 6).map(({ address }) => address)
 }

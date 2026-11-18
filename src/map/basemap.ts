@@ -1,6 +1,6 @@
 import * as L from 'leaflet'
 import { prefersReducedMotion, settle } from './motion'
-import type { LineString, MultiLineString } from 'geojson'
+import type { FeatureCollection, LineString, MultiLineString } from 'geojson'
 import type { Basemap } from '../assets/loadAssets'
 
 const areaColors: Record<string, string> = {
@@ -9,7 +9,32 @@ const areaColors: Record<string, string> = {
   water: 'var(--map-water, #cddcf5)',
 }
 
+export function addRegion(map: L.Map, data: FeatureCollection) {
+  const region = L.layerGroup().addTo(map)
+  L.geoJSON(data, {
+    pane: 'regional-context', interactive: false,
+    style: feature => feature?.properties?.kind === 'road'
+      ? { color: 'var(--map-artery, #d4c4ad)', weight: 1.25 }
+      : { stroke: false, fillColor: areaColors[feature?.properties?.kind] ?? areaColors.land, fillOpacity: 1 },
+  }).addTo(region)
+  const cities: [string, number, number][] = [
+    ['San Francisco', 37.766, -122.444], ['Oakland', 37.805, -122.272],
+    ['Berkeley', 37.872, -122.273], ['Daly City', 37.687, -122.47],
+    ['Sausalito', 37.86, -122.488], ['San Mateo', 37.563, -122.326],
+  ]
+  for (const [name, lat, lng] of cities) {
+    const label = document.createElement('span')
+    label.textContent = name
+    L.marker([lat, lng], {
+      pane: 'regional-context', interactive: false, keyboard: false,
+      icon: L.divIcon({ className: 'regional-label', html: label, iconSize: [100, 20], iconAnchor: [50, 10] }),
+    }).addTo(region)
+  }
+  return region
+}
+
 export function addBasemap(map: L.Map, data: Basemap) {
+  const layers = L.layerGroup()
   L.geoJSON(data.areas, {
     interactive: false,
     style: feature => ({
@@ -17,7 +42,7 @@ export function addBasemap(map: L.Map, data: Basemap) {
       fillColor: areaColors[feature?.properties?.kind] ?? areaColors.land,
       fillOpacity: 1,
     }),
-  }).addTo(map)
+  }).addTo(layers)
   const streets: L.LatLngTuple[][] = []
   const mainStreets: L.LatLngTuple[][] = []
   for (const feature of data.streets.features) {
@@ -26,10 +51,10 @@ export function addBasemap(map: L.Map, data: Basemap) {
     const lines = feature.properties?.major ? mainStreets : streets
     for (const path of segments) lines.push(path.map(([lng, lat]) => [lat, lng]))
   }
-  L.polyline(streets, { interactive: false, color: 'var(--map-road, #ded8cf)', weight: 1.4 }).addTo(map)
-  L.polyline(mainStreets, { interactive: false, color: 'var(--map-artery, #d4c4ad)', weight: 2.4 }).addTo(map)
+  L.polyline(streets, { interactive: false, color: 'var(--map-road, #ded8cf)', weight: 1.4 }).addTo(layers)
+  L.polyline(mainStreets, { interactive: false, color: 'var(--map-artery, #d4c4ad)', weight: 2.4 }).addTo(layers)
 
-  const labels = L.layerGroup().addTo(map)
+  const labels = L.layerGroup().addTo(layers)
   function updateLabels() {
     labels.clearLayers()
     if (map.getZoom() < 13) return
@@ -65,6 +90,13 @@ export function addBasemap(map: L.Map, data: Basemap) {
         { duration: 240, easing: settle })
     }
   }
+  function setDetailVisibility() {
+    if (map.getZoom() >= 13) layers.addTo(map)
+    else layers.remove()
+  }
+  map.on('zoomend', setDetailVisibility)
+  setDetailVisibility()
   map.on('moveend', updateLabels)
   updateLabels()
+  return () => { map.off('moveend', updateLabels); map.off('zoomend', setDetailVisibility); layers.remove() }
 }

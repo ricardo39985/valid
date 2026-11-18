@@ -9,11 +9,12 @@ type Props = {
   onChoose: (address: Address) => void
   placeholder?: string
   initialValue?: string
+  loading?: boolean
   autoFocus?: boolean
 }
 
 export default function AddressSearch({ index, disabled, onChoose, placeholder = 'Enter a San Francisco address',
-  initialValue = '', autoFocus = false }: Props) {
+  loading = false, initialValue = '', autoFocus = false }: Props) {
   const [query, setQuery] = useState(initialValue)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
@@ -33,7 +34,7 @@ export default function AddressSearch({ index, disabled, onChoose, placeholder =
       <Search size={20} aria-hidden="true" />
       <input aria-label={initialValue ? 'Replacement San Francisco address' : 'San Francisco street address'} placeholder={placeholder} autoFocus={autoFocus}
         autoComplete="off" value={query} disabled={disabled} role="combobox"
-        aria-autocomplete="list" aria-expanded={visible && suggestions.length > 0} aria-controls={listId}
+        aria-busy={loading} aria-autocomplete="list" aria-expanded={visible && suggestions.length > 0} aria-controls={listId}
         aria-activedescendant={visible && active >= 0 ? `${listId}-${active}` : undefined}
         onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}
         onChange={event => { setQuery(event.target.value); setOpen(true); setActive(-1) }}
@@ -60,7 +61,7 @@ export default function AddressSearch({ index, disabled, onChoose, placeholder =
           <MapPin size={16} aria-hidden="true" />
           <span>{address[0]} <small>San Francisco{address[4] && `, ${address[4]}`}</small></span>
         </button>)}
-      </div> : <p role="status">No matching address. Try the street number and name.</p>}
+      </div> : <p role="status">{loading ? 'Loading addresses…' : 'No matching address. Try the street number and name.'}</p>}
     </div>}
   </div>
 }

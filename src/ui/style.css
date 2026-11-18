@@ -538,3 +538,6 @@ h1, p { margin: 0; }
   animation: launch-address-out 210ms 1080ms ease both;
 }
 @keyframes launch-address-out { to { opacity: 0; } }
+
+.regional-label { text-align: center; color: var(--muted); font: 650 12px/20px system-ui, sans-serif; pointer-events: none; }
+.regional-label span { background: color-mix(in srgb, var(--map-land, #f6f2eb) 85%, transparent); padding: 2px 5px; border-radius: 6px; }

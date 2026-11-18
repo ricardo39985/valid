@@ -1,6 +1,5 @@
 import { Footprints, List, MapPin, Pencil, Shuffle, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { buildAddressIndex } from '../data'
 import { loadCity, type City } from '../assets/loadAssets'
 import WalkMap from '../map/WalkMap'
 import type { Address, CategoryFilter, Destination } from '../routing/types'
@@ -21,6 +20,7 @@ const walkLimits = [5, 10, 15, 20]
 const categoryOptions = (Object.keys(categories) as CategoryFilter[]).map(value => ({ value, ...categories[value] }))
 const walkOptions = walkLimits.map(value => ({ value, label: `${value} min walk`, icon: Footprints }))
 const maxAddresses = 5
+const emptyIndex: City['index'] = []
 const noDestinations: Destination[] = []
 
 type Home = { address: Address; destinations: Destination[] }
@@ -87,14 +87,19 @@ export default function App() {
     }
   }, [focus, homes.length])
 
+  const [loadComparison, setLoadComparison] = useState(false)
   useEffect(() => {
+    if (!launching && !tour) setLoadComparison(true)
+  }, [launching, tour])
+  useEffect(() => {
+    if (!loadComparison) return
     let current = true
     loadCity().then(data => { if (current) setCity(data) })
       .catch(error => { if (current) { console.error(error); setError(true) } })
     return () => { current = false }
-  }, [attempt])
+  }, [attempt, loadComparison])
 
-  const index = useMemo(() => buildAddressIndex(city?.addresses ?? []), [city])
+  const index = city?.index ?? emptyIndex
   const walkFrom = useMemo(() => city && createRouter(city.network), [city])
   const active = homes[focus]
   const nearby = useMemo(() => homes.map(home =>
@@ -206,7 +211,7 @@ export default function App() {
           {launching && !tour && <LaunchScene onFinish={finishLaunch} />}
           <div className="map-chrome">
             <div className="search-row" ref={searchRow}>
-              <AddressSearch index={index} disabled={!city || homes.length >= maxAddresses} onChoose={pickAddress}
+              <AddressSearch index={index} loading={!city && !error} disabled={error || homes.length >= maxAddresses} onChoose={pickAddress}
                 placeholder={homes.length >= maxAddresses ? 'Five addresses added' : active ? 'Add a San Francisco address' : 'Enter your first address'} />
               <SearchTools onTour={() => { setLaunching(false); setTour(true) }} />
             </div>

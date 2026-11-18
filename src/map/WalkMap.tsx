@@ -1,22 +1,35 @@
 import { Building2, LocateFixed, Minus, Plus } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
 import * as L from 'leaflet'
-import { loadBasemap } from '../assets/loadAssets'
+import { loadBasemap, loadRegion } from '../assets/loadAssets'
 import type { Address, Coordinate, Destination, RouteSegment } from '../routing/types'
 import { categories, homeColors, letters } from '../ui/categories'
-import { addBasemap } from './basemap'
+import { addBasemap, addRegion } from './basemap'
 import { enterMapFeature, prefersReducedMotion, settle } from './motion'
 import { clusterPins } from './cluster'
 import PlaceCallout from './PlaceCallout'
 import { addRoutes, fadeRoutes } from './routeLayers'
 import 'leaflet/dist/leaflet.css'
 
-const initialCenter: L.LatLngTuple = [37.762, -122.433]
-const sanFrancisco: L.LatLngBoundsExpression = [[37.704, -122.525], [37.837, -122.349]]
-const placeIcons = Object.fromEntries(Object.entries(categories).map(([key, category]) =>
-  [key, renderToStaticMarkup(<category.icon size={15} aria-hidden="true" />)]))
-const buildingIcon = renderToStaticMarkup(<Building2 size={19} aria-hidden="true" />)
+const cityBounds: L.LatLngBoundsExpression = [[37.704, -122.514], [37.833, -122.354]]
+const regionBounds: L.LatLngBoundsExpression = [[37.50, -122.70], [38.00, -122.10]]
+
+function showCity(map: L.Map, animate = false) {
+  map.fitBounds(cityBounds, {
+    paddingTopLeft: [16, 116], paddingBottomRight: [16, 85], maxZoom: 12.5, animate,
+  })
+}
+
+function markerIcon(name: string, size: number) {
+  const ns = 'http://www.w3.org/2000/svg'
+  const icon = document.createElementNS(ns, 'svg')
+  icon.setAttribute('width', String(size))
+  icon.setAttribute('height', String(size))
+  const use = document.createElementNS(ns, 'use')
+  use.setAttribute('href', '#map-icon-' + name)
+  icon.append(use)
+  return icon
+}
 const toLatLng = ([longitude, latitude]: Coordinate): L.LatLngTuple => [latitude, longitude]
 
 type Props = {
@@ -40,6 +53,8 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
   const frameDestinations = useRef(framing)
   useLayoutEffect(() => { frameDestinations.current = framing }, [framing])
   const [sceneAddress, setSceneAddress] = useState(address)
+  const currentAddress = useRef(address)
+  useLayoutEffect(() => { currentAddress.current = address }, [address])
   const lastScene = useRef({ address, homeIndex, destinations, segments })
   const currentScene = { address, homeIndex, destinations, segments }
   const displayed = sceneAddress === address ? currentScene : lastScene.current
@@ -61,14 +76,16 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
     let instance: L.Map
     try {
       instance = L.map(container.current, {
-        center: initialCenter, zoom: 12, minZoom: 11, maxZoom: 18, zoomSnap: .5,
-        maxBounds: sanFrancisco, maxBoundsViscosity: .65, zoomControl: false, renderer: L.svg({ padding: .45 }),
+        minZoom: 10, maxZoom: 18, zoomSnap: .5,
+        maxBounds: regionBounds, maxBoundsViscosity: .65, zoomControl: false, renderer: L.svg({ padding: .45 }),
       })
     } catch (error) {
       console.error(error)
       setFailed(true)
       return
     }
+    showCity(instance)
+    instance.createPane('regional-context').style.zIndex = '390'
     instance.attributionControl.setPrefix(false)
     instance.attributionControl.addAttribution('<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>')
     const outlinePane = instance.createPane('walk-outlines')
@@ -84,7 +101,10 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
     let frame = 0
     const observer = new ResizeObserver(() => {
       window.cancelAnimationFrame(frame)
-      frame = window.requestAnimationFrame(() => instance.invalidateSize({ animate: false, debounceMoveend: true }))
+      frame = window.requestAnimationFrame(() => {
+        instance.invalidateSize({ animate: false, debounceMoveend: true })
+        if (!currentAddress.current) showCity(instance)
+      })
     })
     observer.observe(container.current)
     return () => {
@@ -102,21 +122,28 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
     const instance = map.current
     if (!ready || !instance) return
     let current = true
-    loadBasemap().then(data => {
-      if (current) {
-        addBasemap(instance, data)
-        if (!prefersReducedMotion()) instance.getPane('overlayPane')?.animate?.(
-          [{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: settle },
-        )
-        setBaseError(false)
-      }
-    }).catch(error => {
-      if (current) {
-        console.error(error)
-        setBaseError(true)
-      }
-    })
-    return () => { current = false }
+    let loadingDetail = false
+    function detail() {
+      if (!instance || loadingDetail || instance.getZoom() < 13 || !instance.getBounds().intersects(cityBounds)) return
+      loadingDetail = true
+      loadBasemap().then(data => {
+        if (current) detailCleanup = addBasemap(instance, data)
+      }).catch(error => { if (current) { console.error(error); setBaseError(true) } })
+    }
+    let region: L.Layer | undefined
+    let detailCleanup: (() => void) | undefined
+    loadRegion().then(data => {
+      if (current) region = addRegion(instance, data)
+    }).catch(error => { if (current) { console.error(error); setBaseError(true) } })
+    setBaseError(false)
+    detail()
+    instance.on('moveend', detail)
+    return () => {
+      current = false
+      instance.off('moveend', detail)
+      region?.remove()
+      detailCleanup?.()
+    }
   }, [attempt, ready])
 
   useEffect(() => {
@@ -148,7 +175,7 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
     const element = container.current
     if (!ready || !element) return
     if (address) fitAddress()
-    else map.current?.flyTo(initialCenter, 12, { animate: !prefersReducedMotion(), duration: .55 })
+    else if (map.current) showCity(map.current, !prefersReducedMotion())
 
     if (prefersReducedMotion()) {
       setSceneAddress(address)
@@ -173,7 +200,7 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
     const building = document.createElement('div')
     building.className = 'home-marker'
     building.style.setProperty('--pin', homeColors[displayed.homeIndex])
-    building.innerHTML = buildingIcon
+    building.append(markerIcon('home', 19))
     const letter = document.createElement('span')
     letter.textContent = letters[displayed.homeIndex]
     const label = document.createElement('span')
@@ -233,7 +260,7 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
         button.style.setProperty('--pin', categories[place[1]].color)
         button.setAttribute('aria-label', `${place[0]}, ${minutes} minute walk`)
         button.setAttribute('aria-pressed', String(destination === selected))
-        button.innerHTML = placeIcons[place[1]]
+        button.append(markerIcon(place[1], 15))
         button.addEventListener('click', () => onSelect(destination))
         const marker = L.marker(toLatLng(place[2]), {
           icon: L.divIcon({ className: 'marker-anchor', html: button, iconSize: [29, 29], iconAnchor: [14, 24] }),
@@ -290,6 +317,10 @@ export default function WalkMap({ address, homeIndex, destinations, segments, fr
 
   return (
     <section className="map" aria-label="Neighborhood map">
+      <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}><defs>
+        <symbol id="map-icon-home" viewBox="0 0 24 24"><Building2 width="24" height="24" /></symbol>
+        {Object.entries(categories).map(([key, entry]) => <symbol key={key} id={'map-icon-' + key} viewBox="0 0 24 24"><entry.icon width="24" height="24" /></symbol>)}
+      </defs></svg>
       <div className="map-canvas" ref={container} />
       {selected && popupHost && <PlaceCallout key={selected.place.join('|')} destination={selected} host={popupHost}
         onClose={closeCallout} onLayout={refreshPopup} />}
