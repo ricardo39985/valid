@@ -2,7 +2,7 @@
 
 Before You Sign helps San Francisco renters compare up to five addresses by showing what they can walk to from each one.
 
-Apartment listings tell you what's inside. I wanted to see what an ordinary Tuesday would look like outside: where I'd buy groceries, catch the bus, or get coffee. Enter a street address or choose **Surprise me** for two to compare. Add more from the map search bar. Tap an address card to switch the map, or open List for category counts and the shortest walks.
+Apartment listings tell you what’s inside. I wanted to see what an ordinary Tuesday would look like outside. How far would I walk for groceries, coffee, or the bus? Enter an address or choose **Surprise me** for two to compare. Pick a category and walking limit, then switch between addresses to see what changes.
 
 ## Run it
 
@@ -15,26 +15,24 @@ npm test
 npm run build
 ```
 
-The production build is in `dist/`. The city dataset and basemap ship with the repo. Running the app needs a static file server and no data credentials.
+The production build is in `dist/`. It can be served by a static host and needs no environment variables or API keys. For Cloudflare Pages, use `npm run build` and publish `dist`.
 
-## How it fits together
+## Where the data comes from
 
-- `src/ui/` contains address entry, filters, and the comparison panel.
-- `src/map/` draws the local basemap, destinations, and routes in Leaflet.
-- `src/routing/` finds reachable destinations and groups shared paths. A shared street segment gets one color, then the branches take the colors of the places they lead to.
-- `scripts/` extracts and prepares the Overture data.
+`scripts/extract.sh` uses the Overture Maps CLI to download geographic slices from the **2026-10-21.0** release. The preparation scripts turn those slices into compressed files in `src/assets/` for the addresses, places, pedestrian network, and basemap. The network joins road segments using Overture connector IDs.
 
-## Data and trade-offs
+The app serves those files as static assets from the same host as the site. During the splash, the map and comparison data load in parallel and a browser worker prepares the address index. Address search and walking routes run in the browser. The app makes no live calls to Overture. Vite fingerprints the assets and the included Cloudflare Pages headers set long-lived caching for them.
 
-The app uses Overture's **2026-10-21.0** release for street addresses, destinations, transit infrastructure, and the walking network. The graph joins road segments by Overture connector IDs. Each address gets one bounded shortest-path search for the longest supported walk. Shorter limits and category changes reuse those results.
+## Trade-offs and cuts
 
-Walking estimates assume 80 meters per minute. Addresses and destinations snap to nearby graph connectors, and the estimate includes the distance to those connectors. Where the mapped street supports it, the map draws the final approach perpendicular to the street. Those short approaches are estimates, since the source data doesn’t consistently identify building entrances. The app excludes roads outside its pedestrian class allowlist and applies mapped foot access denials. It doesn't model hills, crossing delays, closures, or step-free access. Transit results show mapped stops and stations. Service and schedules are outside scope.
+- Search and comparison cover San Francisco. A simplified Bay Area overview provides context when zoomed out.
+- Each home gets one bounded shortest-path search. Shorter walk limits and category filters reuse its results. The map shows one home’s routes at a time to keep them readable.
+- Walk times use 80 meters per minute and include estimated links from addresses and destinations to the walking network. They don’t account for hills, crossings, closures, or step-free access. Transit shows mapped stops and stations. Live schedules and opening hours are outside scope.
+- The bundled data is about 5.9 MB compressed. The snapshot keeps the app self-contained and requires a new extract to refresh.
 
-I kept the first city to San Francisco and the shortlist to five addresses. The map shows one address's routes at a time, while the other results stay in the comparison panel. There are no accounts, listings, overall scores, or live business hours. The city extract includes a simplified basemap derived from Overture streets, coastline, parks, and water. The opening view fits San Francisco to the screen. A separate 110 KB Overture overview covers the surrounding Bay Area. It uses simplified coastline, large parks and major roads. The map, address index, and walking network load together during the splash screen. A browser worker unpacks and indexes the address data. Detailed streets appear from zoom 13 in San Francisco. Address switches animate using lightweight bitmaps drawn from the same coastline and street data. When the camera settles, the viewport shows detailed streets and the selected home’s routes. Address search and walking comparisons cover San Francisco.
+## Rebuild the data
 
-On first visit the 5.5 MB compressed comparison dataset waits until the tour closes. Address indexing yields between batches. Vite fingerprints the data and code, and the included Cloudflare Pages headers cache those assets for a year while revalidating the entry page.
-
-To rebuild the city and basemap files with Python 3.12 or newer:
+Use Python 3.12 or newer. The prepared files are already included for normal builds.
 
 ```sh
 python -m venv .venv
