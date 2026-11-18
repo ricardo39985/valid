@@ -174,10 +174,12 @@ export default function WalkMap({ savedLocations, address, homeIndex, destinatio
     for (const location of savedLocations) buildings.current?.warm(location)
   }, [ready, savedLocations])
 
+  const endFlight = useRef<(() => void) | null>(null)
   const fitAddress = useCallback(() => {
     const instance = map.current
     if (!address || !instance) return
     requestDetail.current?.()
+    if (endFlight.current) instance.off('moveend', endFlight.current)
     instance.stop().invalidateSize({ animate: false })
     const points = [toLatLng(address[1]), ...frameDestinations.current.map(item => toLatLng(item.place[2]))]
     const bounds = L.latLngBounds(points)
@@ -188,30 +190,31 @@ export default function WalkMap({ savedLocations, address, homeIndex, destinatio
       paddingBottomRight: L.point(52, onPhone ? Math.min(248, Math.floor(height * .37)) : 72),
       animate: !prefersReducedMotion(), duration: .72,
     }
-    if (options.animate) instance.flyToBounds(bounds, options)
-    else instance.fitBounds(bounds, options)
+    if (options.animate) {
+      instance.getContainer().classList.add('address-flight')
+      endFlight.current = () => {
+        instance.getContainer().classList.remove('address-flight')
+        endFlight.current = null
+        setSceneAddress(currentAddress.current)
+      }
+      instance.once('moveend', endFlight.current)
+      instance.flyToBounds(bounds, options)
+    } else {
+      instance.getContainer().classList.remove('address-flight')
+      instance.fitBounds(bounds, options)
+      setSceneAddress(address)
+    }
   }, [address])
 
   useLayoutEffect(() => {
     const element = container.current
     if (!ready || !element) return
     if (address) fitAddress()
-    else if (map.current) showCity(map.current, !prefersReducedMotion())
-
-    if (prefersReducedMotion()) {
-      setSceneAddress(address)
-      return
-    }
-
-    // Change map annotations while their panes are transparent, then reveal
-    // them in place as the camera approaches the new neighborhood.
-    element.classList.add('scene-out')
-    const replace = window.setTimeout(() => setSceneAddress(address), 170)
-    const reveal = window.setTimeout(() => element.classList.remove('scene-out'), address ? 480 : 250)
-    return () => {
-      window.clearTimeout(replace)
-      window.clearTimeout(reveal)
-      element.classList.remove('scene-out')
+    else if (map.current) {
+      map.current.stop()
+      element.classList.remove('address-flight')
+      setSceneAddress(undefined)
+      showCity(map.current, !prefersReducedMotion())
     }
   }, [ready, address, fitAddress])
 

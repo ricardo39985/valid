@@ -10,17 +10,22 @@ const ns = 'http://www.w3.org/2000/svg'
 
 export function buildingLayer(map: L.Map) {
   const tiles = L.layerGroup()
+  const cached = new Map<string, GeographicOverlay>()
+  let visible = new Set<string>()
   const requested = new Set<string>()
   let disposed = false
 
-  function prepare(bounds: L.LatLngBounds) {
+  function prepare(bounds: L.LatLngBounds, viewport = false) {
+    const keys = new Set<string>()
     const start = map.project(bounds.getNorthWest(), tileZoom).divideBy(tileSize).floor()
     const end = map.project(bounds.getSouthEast(), tileZoom).divideBy(tileSize).floor()
     for (let x = start.x; x <= end.x; x++) {
       for (let y = start.y; y <= end.y; y++) {
         const key = x + '-' + y
         const url = files['../assets/buildings/' + key + '.pack']
-        if (!url || requested.has(key)) continue
+        if (!url) continue
+        keys.add(key)
+        if (requested.has(key)) continue
         requested.add(key)
         const tileBounds = L.latLngBounds(
           map.unproject(L.point(x * tileSize, y * tileSize), tileZoom),
@@ -36,8 +41,17 @@ export function buildingLayer(map: L.Map) {
           path.setAttribute('d', d)
           path.setAttribute('vector-effect', 'non-scaling-stroke')
           svg.append(path)
-          new GeographicOverlay(svg, tileBounds, { pane: 'buildings', className: 'building-tile' }).addTo(tiles)
+          const tile = new GeographicOverlay(svg, tileBounds, { pane: 'buildings', className: 'building-tile' })
+          cached.set(key, tile)
+          if (visible.has(key)) tiles.addLayer(tile)
         }).catch(() => requested.delete(key))
+      }
+    }
+    if (viewport) {
+      visible = keys
+      for (const [key, tile] of cached) {
+        if (keys.has(key)) tiles.addLayer(tile)
+        else tiles.removeLayer(tile)
       }
     }
   }
@@ -45,7 +59,7 @@ export function buildingLayer(map: L.Map) {
   function update() {
     if (map.getZoom() < 14) { tiles.remove(); return }
     tiles.addTo(map)
-    prepare(map.getBounds())
+    prepare(map.getBounds(), true)
   }
   map.on('moveend', update)
   update()

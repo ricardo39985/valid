@@ -505,7 +505,6 @@ h1, p { margin: 0; }
   .empty-map .map .overture-credit, .empty-map .map .leaflet-control-attribution { margin-bottom: 72px; }
 }
 .scene-pane { transition: opacity 260ms var(--settle); }
-.scene-out .scene-pane { opacity: 0; transition-duration: 150ms; }
 @media (prefers-reduced-motion: reduce) { .scene-pane { transition: none; } }
 .nearby-navigation { display: grid; overflow: hidden; }
 .nearby-view {
@@ -545,3 +544,12 @@ h1, p { margin: 0; }
 .building-tile { overflow: hidden; }
 .building-tile path { fill: #dbd4ca; stroke: #bcb3a7; stroke-width: .55px; }
 [data-theme="dark"] .building-tile path { fill: #363c49; stroke: #545a65; }
+
+canvas.carto-surface { position: absolute; top: 0; left: 0; transform-origin: top left; }
+.flight-preview { position: absolute; top: 0; left: 0; transform-origin: top left; pointer-events: none; }
+.address-flight :is(.carto-surface, .leaflet-buildings-pane, .scene-pane, .leaflet-street-labels-pane) { visibility: hidden; }
+.map-canvas:not(.address-flight) :is(.leaflet-buildings-pane, .scene-pane, .leaflet-street-labels-pane) { animation: detail-return 190ms ease-out; }
+@keyframes detail-return { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .map-canvas:not(.address-flight) :is(.leaflet-buildings-pane, .scene-pane, .leaflet-street-labels-pane) { animation: none; }
+}
