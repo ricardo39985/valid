@@ -480,7 +480,10 @@ h1, p { margin: 0; }
 .carto-surface, .building-tile { pointer-events: none; }
 .building-tile { overflow: hidden; }
 .building-tile path { fill: #dbd4ca; stroke: #bcb3a7; stroke-width: .55px; }
-[data-theme="dark"] .building-tile path { fill: #363c49; stroke: #545a65; }
+/* Keep the dense footprint geometry in one palette so theme changes can
+   recolor its composited layer without restyling every polygon. */
+.leaflet-buildings-pane { will-change: filter; }
+[data-theme="dark"] .leaflet-buildings-pane { filter: invert(1) contrast(.86) brightness(1.07); }
 
 canvas.carto-surface { position: absolute; top: 0; left: 0; transform-origin: top left; }
 .flight-preview { position: absolute; top: 0; left: 0; transform-origin: top left; pointer-events: none; }
