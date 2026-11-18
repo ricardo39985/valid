@@ -1,4 +1,4 @@
-import { Building2, ChevronDown, Footprints, List, Plus, Shuffle, X } from 'lucide-react'
+import { Building2, ChevronDown, Footprints, List, MapPin, Plus, Shuffle, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { buildAddressIndex } from '../data'
 import { loadCity, type City } from '../assets/loadAssets'
@@ -6,10 +6,13 @@ import WalkMap from '../map/WalkMap'
 import type { Address, CategoryFilter, Destination } from '../routing/types'
 import { createRouter, filterDestinations, routeSegments } from '../routing/walk'
 import AddressSearch from './AddressSearch'
+import AddressFocusRing from './AddressFocusRing'
+import { prefersReducedMotion } from '../map/motion'
 import { categories, homeColors, letters, sharedColor } from './categories'
 
 const walkLimits = [5, 10, 15, 20]
 const maxAddresses = 5
+const noDestinations: Destination[] = []
 
 type Home = { address: Address; destinations: Destination[] }
 
@@ -46,6 +49,8 @@ export default function App() {
   const selectPlace = useCallback((destination: Destination) => {
     setSelected(current => current === destination ? null : destination)
   }, [])
+
+  const closePlace = useCallback(() => setSelected(null), [])
 
   function pickAddress(address: Address) {
     const existing = homes.findIndex(home => home.address === address)
@@ -117,7 +122,7 @@ export default function App() {
       <main className="workspace">
         <div className="map-region">
           <WalkMap address={active?.address} homeIndex={focus} segments={segments}
-            destinations={destinations ?? []} selected={selected} onSelect={selectPlace} />
+            destinations={destinations ?? noDestinations} selected={selected} onSelect={selectPlace} onClose={closePlace} />
           {active && <div className="map-toolbar">
             <label className="glass-select"><CategoryIcon size={17} style={{ color: categories[category].color }} aria-hidden="true" />
               <select aria-label="Destination category" value={category} onChange={event => {
@@ -143,10 +148,7 @@ export default function App() {
               })}
             </>}
           </div>}
-          {selected && <div className="place-preview" role="status">
-            <div><strong>{selected.place[0]}</strong><span>{selected.minutes} min walk · {categories[selected.place[1]].label}</span></div>
-            <button className="icon-button" aria-label="Clear selected place" onClick={() => setSelected(null)}><X size={19} /></button>
-          </div>}
+
         </div>
 
         <aside className="board" aria-label={active ? 'Address comparison' : 'Find an address'}>
@@ -166,14 +168,16 @@ export default function App() {
             <div className="board-heading">
               <div>
                 {homes.length > 1 && <p className="comparison-label">Compare {homes.length} addresses</p>}
-                <h1>{category === 'all' ? active.address[0] : `${categories[category].label} near ${active.address[0]}`}</h1>
+                <h1 key={active.address[0] + category} className="focus-heading">{category === 'all' ? active.address[0] : `${categories[category].label} near ${active.address[0]}`}</h1>
               </div>
               <button className="subtle-button" aria-expanded={listOpen} onClick={() => setListOpen(!listOpen)}>
                 <List size={17} />{listOpen ? 'Hide list' : 'List'}
               </button>
             </div>
 
-            <div className={`address-cards ${homes.length === 1 ? 'single-card' : ''}`}>
+            <div className={`address-cards ${homes.length === 1 ? 'single-card' : ''}`}
+              style={{ '--focus-color': homeColors[focus] } as React.CSSProperties}>
+              <AddressFocusRing activeIndex={focus} count={homes.length} editing={editing} />
               {homes.map((home, i) => {
                 const results = nearby[i]
                 const isActive = focus === i
@@ -181,10 +185,10 @@ export default function App() {
                   <button type="button" className="address-card" style={{ '--home': homeColors[i] } as React.CSSProperties}
                     aria-pressed={isActive} onClick={() => focusAddress(i)}>
                     <span className="address-label"><span className="letter">{letters[i]}</span><span>{home.address[0]}</span></span>
-                    <strong>{category === 'all' ? results.length : results[0] ? `${results[0].minutes} min` : 'None'}</strong>
+                    <strong key={category + minutes} className="result-number">{category === 'all' ? results.length : results[0] ? `${results[0].minutes} min` : 'None'}</strong>
                     <span className="address-metric">{category === 'all' ? (results.length === 1 ? 'place' : 'places') :
                       results.length ? `${results.length} nearby` : 'within range'}</span>
-                    <span className="on-map">{isActive && 'On map'}</span>
+                    <span className="on-map">{isActive && <><MapPin size={12} />On map</>}</span>
                   </button>
                   {editing && <button className="remove-address icon-button" aria-label={`Remove ${home.address[0]}`}
                     onClick={() => removeAddress(i)}><X size={16} /></button>}
@@ -202,11 +206,16 @@ export default function App() {
 
             {!destinations?.length && <p className="status">Nothing mapped within this walk time. Try a longer walk or another category.</p>}
 
-            {listOpen && !!destinations?.length && <ul className="place-list" aria-label="Nearby places">
+            {listOpen && !!destinations?.length && <ul className="place-list fresh-list" aria-label="Nearby places">
               {destinations.map((destination, i) => {
                 const { place, minutes } = destination
                 const entry = categories[place[1]]
-                return <li key={place[0] + i}><button aria-pressed={selected === destination} onClick={() => selectPlace(destination)}>
+                return <li key={place[0] + i}><button aria-pressed={selected === destination} onClick={() => {
+                  if (selected !== destination && window.matchMedia('(max-width: 860px)').matches) {
+                    document.querySelector('.map-region')?.scrollIntoView({ behavior: prefersReducedMotion() ? 'instant' : 'smooth', block: 'start' })
+                  }
+                  selectPlace(destination)
+                }}>
                   <span className="list-icon" style={{ color: entry.color }}><entry.icon size={18} /></span>
                   <span>{place[0]}<small>{entry.label}</small></span><strong>{minutes} min</strong>
                 </button></li>

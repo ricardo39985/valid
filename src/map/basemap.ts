@@ -1,4 +1,5 @@
 import * as L from 'leaflet'
+import type { LineString, MultiLineString } from 'geojson'
 import type { Basemap } from '../assets/loadAssets'
 
 const areaColors: Record<string, string> = {
@@ -16,34 +17,45 @@ export function addBasemap(map: L.Map, data: Basemap) {
       fillOpacity: 1,
     }),
   }).addTo(map)
-  L.geoJSON(data.streets, {
-    interactive: false,
-    style: feature => ({
-      color: feature?.properties?.major ? '#d1c4ac' : '#dcd6ce',
-      weight: feature?.properties?.major ? 2.3 : 1.25,
-      opacity: .9,
-    }),
-  }).addTo(map)
+  const streets: L.LatLngTuple[][] = []
+  const mainStreets: L.LatLngTuple[][] = []
+  for (const feature of data.streets.features) {
+    const geometry = feature.geometry as LineString | MultiLineString
+    const segments = geometry.type === 'LineString' ? [geometry.coordinates] : geometry.coordinates
+    const lines = feature.properties?.major ? mainStreets : streets
+    for (const path of segments) lines.push(path.map(([lng, lat]) => [lat, lng]))
+  }
+  L.polyline(streets, { interactive: false, color: '#ded8cf', weight: 1.4 }).addTo(map)
+  L.polyline(mainStreets, { interactive: false, color: '#d4c4ad', weight: 2.4 }).addTo(map)
 
   const labels = L.layerGroup().addTo(map)
   function updateLabels() {
     labels.clearLayers()
     if (map.getZoom() < 13) return
     const bounds = map.getBounds()
-    const occupied = new Set<string>()
+    const names = new Set<string>()
+    const used: L.Bounds[] = []
     // Major streets get first choice of screen space where labels would collide.
     for (const feature of data.labels.features) {
       const [longitude, latitude] = feature.geometry.coordinates
       const point: L.LatLngTuple = [latitude, longitude]
       if (!bounds.contains(point) || (!feature.properties.major && map.getZoom() < 14)) continue
+      const { name, angle } = feature.properties
+      if (names.has(name)) continue
       const pixel = map.latLngToContainerPoint(point)
-      const cell = `${Math.floor(pixel.x / 87)}:${Math.floor(pixel.y / 48)}`
-      if (occupied.has(cell)) continue
-      occupied.add(cell)
+      const radians = angle * Math.PI / 180
+      const halfWidth = Math.min(88, name.length * 2.6 + 6)
+      const halfHeight = 9
+      const x = Math.abs(Math.cos(radians)) * halfWidth + Math.abs(Math.sin(radians)) * halfHeight
+      const y = Math.abs(Math.sin(radians)) * halfWidth + Math.abs(Math.cos(radians)) * halfHeight
+      const labelBounds = L.bounds([pixel.x - x, pixel.y - y], [pixel.x + x, pixel.y + y])
+      if (used.some(box => box.intersects(labelBounds))) continue
+      used.push(labelBounds)
+      names.add(name)
       const label = document.createElement('span')
       label.className = 'street-label'
-      label.textContent = feature.properties.name
-      label.style.setProperty('--angle', `${feature.properties.angle}deg`)
+      label.textContent = name
+      label.style.setProperty('--angle', `${angle}deg`)
       L.marker(point, {
         icon: L.divIcon({ className: 'street-icon', html: label, iconSize: [0, 0] }),
         interactive: false, keyboard: false, pane: 'street-labels',
