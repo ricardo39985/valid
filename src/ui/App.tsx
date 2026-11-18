@@ -99,7 +99,6 @@ export default function App() {
 
   const index = city?.index ?? emptyIndex
   const walkFrom = useMemo(() => city && createRouter(city.network), [city])
-  const savedLocations = useMemo(() => homes.map(home => home.address[1]), [homes])
   const active = homes[focus]
   const nearby = useMemo(() => homes.map(home =>
     filterDestinations(home.destinations, category, minutes)), [homes, category, minutes])
@@ -239,7 +238,7 @@ export default function App() {
     <div className={`app ${active ? 'has-results' : 'empty-map'} ${listOpen ? 'list-open' : ''}`}>
       <main className="workspace" data-sheet-hidden={collapsed || undefined}>
         <div className="map-region">
-          <WalkMap savedLocations={savedLocations} address={active?.address} homeIndex={focus} segments={segments}
+          <WalkMap address={active?.address} homeIndex={focus} segments={segments}
             destinations={mapDestinations} framing={destinations ?? noDestinations} selected={selected}
             onCluster={showCluster} onSelect={selectPlace} onClose={closePlace} />
           <div className="map-chrome">

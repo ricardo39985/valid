@@ -477,25 +477,14 @@ h1, p { margin: 0; }
 
 .regional-label { text-align: center; color: var(--muted); font: 650 12px/20px system-ui, sans-serif; pointer-events: none; }
 .regional-label span { background: color-mix(in srgb, var(--map-land, #f6f2eb) 85%, transparent); padding: 2px 5px; border-radius: 6px; }
-.carto-surface, .building-tile { pointer-events: none; }
-.building-tile { overflow: hidden; }
-.building-tile path { fill: #dbd4ca; stroke: #bcb3a7; stroke-width: .55px; }
-/* Keep the dense footprint geometry in one palette so theme changes can
-   recolor its composited layer without restyling every polygon. */
-.leaflet-buildings-pane { will-change: filter; }
-[data-theme="dark"] .leaflet-buildings-pane { filter: invert(1) contrast(.86) brightness(1.07); }
-
+.carto-surface { pointer-events: none; }
 canvas.carto-surface { position: absolute; top: 0; left: 0; transform-origin: top left; }
 .flight-preview { position: absolute; top: 0; left: 0; transform-origin: top left; pointer-events: none; }
-.address-flight :is(.carto-surface, .leaflet-buildings-pane, .scene-pane, .leaflet-street-labels-pane) { visibility: hidden; }
-@media (prefers-reduced-motion: no-preference) {
-  .leaflet-buildings-pane { opacity: 1; transition: opacity 140ms ease-out; }
-  .leaflet-buildings-pane.building-zooming { visibility: hidden; opacity: 0; transition: none; }
-}
-.map-canvas:not(.address-flight) :is(.leaflet-buildings-pane, .scene-pane, .leaflet-street-labels-pane) { animation: detail-return 190ms ease-out; }
+.address-flight :is(.carto-surface, .scene-pane, .leaflet-street-labels-pane) { visibility: hidden; }
+.map-canvas:not(.address-flight) :is(.scene-pane, .leaflet-street-labels-pane) { animation: detail-return 190ms ease-out; }
 @keyframes detail-return { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .map-canvas:not(.address-flight) :is(.leaflet-buildings-pane, .scene-pane, .leaflet-street-labels-pane) { animation: none; }
+  .map-canvas:not(.address-flight) :is(.scene-pane, .leaflet-street-labels-pane) { animation: none; }
 }
 
 /* Keep native scrolling, including keyboard and touch, without visible tracks. */

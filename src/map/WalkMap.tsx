@@ -6,7 +6,6 @@ import type { Address, Coordinate, Destination, RouteSegment } from '../routing/
 import { categories, homeColors, letters } from '../ui/categories'
 import { addBasemap, addRegion } from './basemap'
 import { enterMapFeature, prefersReducedMotion, settle } from './motion'
-import { buildingLayer } from './buildings'
 import { clusterPins } from './cluster'
 import PlaceCallout from './PlaceCallout'
 import { addRoutes, fadeRoutes } from './routeLayers'
@@ -34,7 +33,6 @@ function markerIcon(name: string, size: number) {
 const toLatLng = ([longitude, latitude]: Coordinate): L.LatLngTuple => [latitude, longitude]
 
 type Props = {
-  savedLocations: Coordinate[]
   address?: Address
   homeIndex: number
   destinations: Destination[]
@@ -48,7 +46,7 @@ type Props = {
 
 type Pin = { button: HTMLButtonElement; marker: L.Marker }
 
-export default function WalkMap({ savedLocations, address, homeIndex, destinations, segments, framing, onCluster, selected, onSelect, onClose }: Props) {
+export default function WalkMap({ address, homeIndex, destinations, segments, framing, onCluster, selected, onSelect, onClose }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const pins = useRef(new Map<Destination, Pin>())
@@ -64,7 +62,6 @@ export default function WalkMap({ savedLocations, address, homeIndex, destinatio
   useLayoutEffect(() => {
     if (sceneReady) lastScene.current = { address, homeIndex, destinations, segments }
   }, [sceneReady, address, homeIndex, destinations, segments])
-  const buildings = useRef<ReturnType<typeof buildingLayer> | null>(null)
   const requestDetail = useRef<(() => void) | null>(null)
   const routes = useRef<ReturnType<typeof addRoutes> | null>(null)
   const cancelRouteExit = useRef<(() => void) | null>(null)
@@ -91,8 +88,6 @@ export default function WalkMap({ savedLocations, address, homeIndex, destinatio
     showCity(instance)
     instance.createPane('regional-context').style.zIndex = '390'
     instance.createPane('city-cartography').style.zIndex = '395'
-    instance.createPane('buildings').style.zIndex = '398'
-    buildings.current = buildingLayer(instance)
     instance.attributionControl.setPrefix(false)
     instance.attributionControl.addAttribution('<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>')
     const outlinePane = instance.createPane('walk-outlines')
@@ -118,8 +113,6 @@ export default function WalkMap({ savedLocations, address, homeIndex, destinatio
       window.cancelAnimationFrame(frame)
       observer.disconnect()
       cancelRouteExit.current?.()
-      buildings.current?.dispose()
-      buildings.current = null
       instance.remove()
       map.current = null
       routes.current = null
@@ -168,11 +161,6 @@ export default function WalkMap({ savedLocations, address, homeIndex, destinatio
     if (routes.current) cancelRouteExit.current = fadeRoutes(routes.current)
     routes.current = displayed.segments.length ? addRoutes(instance, displayed.segments) : null
   }, [ready, displayed.segments])
-
-  useEffect(() => {
-    if (!ready) return
-    for (const location of savedLocations) buildings.current?.warm(location)
-  }, [ready, savedLocations])
 
   const endFlight = useRef<(() => void) | null>(null)
   const fitAddress = useCallback(() => {
