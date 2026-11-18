@@ -5,7 +5,8 @@ import { prefersReducedMotion } from '../map/motion'
 import { categories } from './categories'
 import { captureSharedElements, carrySharedElements } from './panelMotion'
 
-export default function NearbyList({ focus, onFocusCategory, items, selected, onSelect, showGroup, open, onClose, onClearGroup }: {
+export default function NearbyList({ address, focus, onFocusCategory, items, selected, onSelect, showGroup, open, onClose, onClearGroup }: {
+  address: string
   focus: Category | null
   onFocusCategory: (category: Category | null) => void
   items: Destination[]
@@ -16,6 +17,8 @@ export default function NearbyList({ focus, onFocusCategory, items, selected, on
   onClose: () => void
   onClearGroup: () => void
 }) {
+  // Address labels contain the house number and street. Neighborhood is stored separately.
+  const title = `Places near ${address}`
   const drilledIn = focus !== null
   const showDetails = showGroup || drilledIn
   const back = useRef<HTMLButtonElement>(null)
@@ -67,7 +70,7 @@ export default function NearbyList({ focus, onFocusCategory, items, selected, on
           <strong data-shared>{activeCategory.label}</strong>
         </> : <>
           <List size={17} className="nearby-title-icon" aria-hidden="true" />
-          <strong>{showGroup ? 'Places in this group' : 'Nearby places'}</strong>
+          <strong title={title}>{title}</strong>
         </>}
       </div>
       <button className="icon-button nearby-close" aria-label="Close nearby places" onClick={onClose}><X size={17} /></button>
@@ -96,7 +99,7 @@ export default function NearbyList({ focus, onFocusCategory, items, selected, on
           </ul>
         </section>}
         <section className="nearby-view detail-view" aria-hidden={!showDetails} inert={!showDetails}>
-          <ul className="place-list" aria-label="Nearby places">
+          <ul className="place-list" aria-label={title}>
             {(focus ? groups.get(focus) ?? [] : showGroup ? items : []).map((destination, i) => {
               const { place, minutes } = destination
               const entry = categories[place[1]]

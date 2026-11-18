@@ -119,12 +119,12 @@
 .project-menu .appearance-segments button { flex: 1; background: transparent; padding: 0 7px; }
 .project-menu .auto-mode { background: transparent; color: var(--muted); transition: background-color 200ms, color 200ms; }
 .project-menu .auto-mode[aria-pressed="true"] { color: var(--accent); background: var(--tint); }
-[data-appearance-reveal]::view-transition-old(root), [data-appearance-reveal]::view-transition-new(root) { mix-blend-mode: normal; animation: none; }
-[data-appearance-reveal]::view-transition-new(root) { animation: spread-theme 530ms cubic-bezier(.24,.6,.26,1) both; }
-@keyframes spread-theme {
-  from { clip-path: circle(0px at var(--reveal-origin)); }
-  to { clip-path: circle(var(--reveal-radius) at var(--reveal-origin)); }
+.appearance-reveal { position: fixed; inset: 0; z-index: 1000; overflow: clip; pointer-events: none; }
+.appearance-reveal-circle {
+  position: absolute; border-radius: 50%;
+  background: #f5f4f9; will-change: transform, opacity;
 }
+.appearance-reveal-circle[data-dark="true"] { background: #1c1c1e; }
 @media (prefers-reduced-motion: reduce) { .appearance-thumb,.project-menu .auto-mode { transition: none; } }
 
 .tour { touch-action: pan-y pinch-zoom; }

@@ -33,34 +33,51 @@ export function useAppearance() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', useDark ? '#1c1c1e' : '#f5f4f9')
     savePreference('appearance', applied)
   }, [applied, systemDark])
-  const activeReveal = useRef<ViewTransition | null>(null)
-  const revision = useRef(0)
+  const activeReveal = useRef<HTMLDivElement | null>(null)
+  useEffect(() => () => activeReveal.current?.remove(), [])
+
+  function clearReveal() {
+    const previous = activeReveal.current
+    previous?.getAnimations({ subtree: true }).forEach(animation => animation.cancel())
+    previous?.remove()
+    activeReveal.current = null
+  }
   function chooseMode(next: Mode, button: HTMLElement) {
-    const turn = ++revision.current
-    activeReveal.current?.skipTransition()
+    clearReveal()
     setMode(next)
     const nextDark = next === 'auto' ? systemDark : next === 'dark'
-    if (nextDark === (document.documentElement.dataset.theme === 'dark') || !document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (nextDark === (document.documentElement.dataset.theme === 'dark') || !button.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setApplied(next)
       return
     }
+
     const box = button.getBoundingClientRect()
     const x = box.left + box.width / 2
     const y = box.top + box.height / 2
-    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y))
-    const root = document.documentElement
-    root.style.setProperty('--reveal-origin', `${x}px ${y}px`)
-    root.style.setProperty('--reveal-radius', `${Math.ceil(radius)}px`)
-    root.dataset.appearanceReveal = ''
-    const reveal = document.startViewTransition(() => { if (turn === revision.current) flushSync(() => setApplied(next)) })
-    activeReveal.current = reveal
-    void reveal.finished.finally(() => {
-      if (activeReveal.current !== reveal) return
-      activeReveal.current = null
-      delete root.dataset.appearanceReveal
-      root.style.removeProperty('--reveal-origin')
-      root.style.removeProperty('--reveal-radius')
-    })
+    const radius = Math.ceil(Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)))
+    const veil = document.createElement('div')
+    veil.className = 'appearance-reveal'
+    veil.setAttribute('aria-hidden', 'true')
+    const circle = document.createElement('div')
+    circle.className = 'appearance-reveal-circle'
+    circle.dataset.dark = String(nextDark)
+    Object.assign(circle.style, { left: `${x - radius}px`, top: `${y - radius}px`, width: `${2 * radius}px`, height: `${2 * radius}px` })
+    veil.append(circle)
+    document.body.append(veil)
+    activeReveal.current = veil
+
+    // Start on the click frame. Apply the theme once the veil covers the map,
+    // then let the live UI emerge as the veil fades.
+    const spread = circle.animate([{ transform: 'scale(.012)' }, { transform: 'scale(1)' }],
+      { duration: 235, easing: 'cubic-bezier(.22,.72,.28,1)', fill: 'both' })
+    spread.onfinish = () => {
+      if (activeReveal.current !== veil) return
+      flushSync(() => setApplied(next))
+      const fade = circle.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 135, easing: 'ease-out', fill: 'both' })
+      fade.onfinish = () => {
+        if (activeReveal.current === veil) clearReveal()
+      }
+    }
   }
   return { dark, mode, chooseMode }
 }

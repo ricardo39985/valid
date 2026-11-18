@@ -299,7 +299,7 @@ export default function App() {
               </div>
               <button ref={listButton} className="subtle-button nearby-trigger" aria-expanded={listOpen} aria-controls="nearby-panel"
                 onClick={toggleList}>
-                <List size={17} /><span className="mobile-only">List</span><span className="desktop-only">Nearby places</span>
+                <List size={17} /><span className="mobile-only">List</span><span className="desktop-only">View places</span>
               </button>
             </div>
 
@@ -308,7 +308,7 @@ export default function App() {
                 if (event.key === 'Escape') { setListOpen(false); listButton.current?.focus({ preventScroll: true }) }
               }}>
               <div className="list-drawer-content">
-                <NearbyList key={active.address[0] + toolbarCategory + minutes + listRevision + (cluster ? cluster.map(item => item.place[0]).join() : "")}
+                <NearbyList address={active.address[0]} key={active.address[0] + toolbarCategory + minutes + listRevision + (cluster ? cluster.map(item => item.place[0]).join() : "")}
                   focus={cluster ? null : listCategory}
                   onFocusCategory={value => { setListCategory(value); setSelected(null) }}
                   items={cluster ?? overview} selected={selected} showGroup={!!cluster} open={listOpen}
