@@ -6,9 +6,9 @@ import filter from '../assets/tour/filter.webp'
 import compare from '../assets/tour/compare.webp'
 
 const steps = [
-  { image: walk, title: 'See what’s a walk away.', body: 'Enter a San Francisco address to see walking routes to groceries, transit, cafés, parks and pharmacies.' },
-  { image: filter, title: 'Find your everyday stops.', body: 'Choose a category and a walk of 5 to 20 minutes. Tap a pin to see the place and its estimated walking time.' },
-  { image: compare, title: 'Compare before you sign.', body: 'Add up to five addresses. Compare their nearby places side by side, then tap a home to see its routes on the map.' },
+  { image: walk, title: 'Before you sign the lease.', body: 'You’ve seen the apartment. What’s around it? Start with a San Francisco address to see what you could walk to from home.' },
+  { image: filter, title: 'Picture a Tuesday there.', body: 'Could you pick up groceries on foot or catch a nearby bus? Choose how far you’d walk and see which everyday stops are within reach.' },
+  { image: compare, title: 'Which apartment fits your day?', body: 'Compare up to five addresses. See which puts the places you use most within an easy walk.' },
 ]
 
 export default function Onboarding({ intro, onIntroDone, onDone }: { intro: boolean; onIntroDone: () => void; onDone: () => void }) {

@@ -1,21 +1,13 @@
-.search-row, .search-tools, .appearance { display: flex; align-items: center; gap: 6px; }
+.search-row, .search-tools { display: flex; align-items: center; gap: 6px; }
 .search-row > .address-search { flex: 1; min-width: 0; }
 .search-tools { flex: none; }
-.appearance, .more-tools {
-  border: 1px solid var(--line); background: var(--glass); border-radius: 28px;
-  box-shadow: var(--shadow-glass); backdrop-filter: blur(20px) saturate(145%);
-}
-.appearance { padding: 4px; gap: 2px; }
-.mode-switch, .auto-mode, .more-tools { display: inline-grid; place-items: center; border-radius: 22px; }
-.mode-switch { width: 50px; height: 34px; position: relative; isolation: isolate; grid-template-columns: 1fr 1fr; padding: 0 3px; background: transparent; border: none; }
-.mode-switch span { position: absolute; z-index: -1; inset: 5px auto 5px 2px; width: 24px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 5px #21163d38; transition: transform 250ms var(--settle); }
-.mode-switch[aria-checked="true"] span { transform: translateX(22px); }
-.auto-mode { height: 34px; padding: 0 7px; border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; }
-.auto-mode[aria-pressed="true"], .tour-brand > span { background: var(--tint); color: var(--accent); }
+.more-tools { display: grid; place-items: center; border: 1px solid var(--line); background: var(--glass); border-radius: 28px;
+  box-shadow: var(--shadow-glass); backdrop-filter: blur(20px) saturate(145%); }
+.tour-brand > span { background: var(--tint); color: var(--accent); }
 .more-tools { width: 44px; height: 44px; color: var(--ink); }
 .project-tools { position: relative; }
-.project-menu.filter-popover { left: auto; right: 0; min-width: 205px; }
-.project-menu a, .project-menu button { display: flex; align-items: center; gap: 10px; min-height: 43px; padding: 0 12px; font-size: 14px; text-decoration: none; color: var(--ink); border-radius: 12px; }
+.project-menu.filter-popover { left: auto; right: 0; width: min(288px, calc(100vw - 32px)); }
+.project-menu a, .project-menu > div > button { display: flex; align-items: center; gap: 10px; min-height: 43px; padding: 0 12px; font-size: 14px; text-decoration: none; color: var(--ink); border-radius: 12px; }
 .project-menu :is(a,button):hover { background: var(--tint); }
 :root { --tint: #eee9ff; --tour-bg: #fbfaff; }
 .desktop-only { display: none; }
@@ -74,7 +66,7 @@
 .tour-brand { font-weight: 750; letter-spacing: -.025em; }
 .tour-brand > span,.tour-back { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 12px; }
 .tour header button { border: 0; background: transparent; color: var(--accent); font-weight: 650; padding: 10px; }
-.tour-visual { border-radius: 23px; overflow: hidden; flex: none; width: 100%; height: min(40dvh, 355px); background: var(--tint); }
+.tour-visual { border-radius: 23px; overflow: hidden; flex: none; aspect-ratio: 547 / 621; width: min(100%, 44dvh); align-self: center; }
 .tour-track { display: flex; width: 100%; height: 100%; transition: transform 440ms var(--settle); }
 .tour-track img { flex: 0 0 100%; width: 100%; min-width: 0; object-fit: contain; }
 .tour-copy { min-height: 134px; }
@@ -95,18 +87,18 @@
 @media (prefers-reduced-motion: reduce) {
   .tour[open], .tour-copy > div { animation: veil-in 100ms linear; }
   .tour[data-closing="true"] { animation: tour-exit 1ms linear; }
-  .mode-switch span,.tour-track,.tour-progress span { transition: none; }
+  .appearance-thumb,.tour-track,.tour-progress span { transition: none; }
 }
 
 :root[data-theme="dark"] {
-  color-scheme: dark; color: #f2eff8; background: #171722;
-  --ink: #f2eff8; --muted: #c2bed0; --surface: #343341; --tour-bg: #252432;
-  --line: #494656; --accent: #beadff; --tint: #3c3554; --glass: #262532e8;
+  color-scheme: dark; color: #f5f5f7; background: #000;
+  --ink: #f5f5f7; --muted: #c7c7cc; --surface: #48484a; --tour-bg: #1c1c1e;
+  --line: #38383a; --accent: #beadff; --tint: #3c3554; --glass: #2c2c2ee8;
   --shadow-glass: 0 5px 22px #06050e55, inset 0 1px 0 #ffffff16;
   --map-land: #272b36; --map-green: #2b403a; --map-water: #1b2c43; --map-road: #434958; --map-artery: #655e5c;
 }
 [data-theme="dark"] .map-canvas.leaflet-container { background: var(--map-water); }
-[data-theme="dark"] .launch-scene { background: radial-gradient(ellipse at 50% 38%, #393448, #1b1926); }
+[data-theme="dark"] .launch-scene { background: radial-gradient(ellipse at 50% 38%, #2c2c2e, #141416); }
 [data-theme="dark"] .street-label { background: #272b36b8; color: #cdc9d5; text-shadow: none; }
 [data-theme="dark"] :is(.map-editor,.filter-popover,.list-drawer,.map-message,.place-callout,.place-callout::after,.search-popover,.search-popover button,.address-card,.subtle-button,.app .board) { background: var(--tour-bg); color: var(--ink); border-color: var(--line); }
 [data-theme="dark"] :is(.map-chrome .search-field,.glass-select,.map-buttons,.map-legend,.home-map-label,.leaflet-control-attribution,.overture-credit) { background: var(--glass); color: var(--ink); border-color: var(--line); box-shadow: var(--shadow-glass); }
@@ -119,7 +111,7 @@
 [data-theme="dark"] :is(.nearby-trigger[aria-expanded="true"],.filter-popover button[aria-selected="true"],.filter-check) { color: var(--accent); }
 [data-theme="dark"] :is(.filter-popover button:hover,.filter-popover button:focus-visible,.card-actions button:hover,.nearby-overview button:hover,.map-buttons button:hover,.subtle-button:hover,.icon-button:hover,.place-list button:hover,.search-popover button:hover,.search-popover button[aria-selected="true"],.place-list button[aria-pressed="true"],.nearby-trigger[aria-expanded="true"]) { background: var(--tint); }
 [data-theme="dark"] .cluster-marker { background: #403953; color: white; box-shadow: inset 0 0 0 2px #6b6087; }
-[data-theme="dark"] .tour-visual { background: #313440; }
+
 
 /* The first tour page is already beneath the splash as its illustration recedes. */
 .tour[open][data-intro="true"] { animation: none; }
@@ -127,7 +119,25 @@
 .tour-launch > span { position: relative; display: block; width: min(438px, 96vw, 75dvh); }
 .tour-launch img { width: 100%; display: block; }
 .tour-launch b { position: absolute; top: 35%; left: 50%; transform: translate(-50%,-50%); padding: 6px 12px; border-radius: 20px; font-size: 12px; background: var(--tour-bg); color: var(--ink); box-shadow: var(--shadow-glass); }
-[data-theme="dark"] .tour-launch { background: radial-gradient(ellipse at 50% 38%, #393448, #1b1926); }
+[data-theme="dark"] .tour-launch { background: radial-gradient(ellipse at 50% 38%, #2c2c2e, #141416); }
 @keyframes intro-handoff { 0%, 72% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .tour-launch { animation-duration: 1ms; } }
 .search-tools, .project-menu:not([inert]) { pointer-events: auto; }
+
+.menu-appearance { padding: 8px 8px 12px; margin-bottom: 5px; border-bottom: 1px solid var(--line); }
+.menu-appearance h2 { font-size: 12px; font-weight: 650; color: var(--muted); margin: 0 0 8px 3px; }
+.appearance-row,.appearance-segments { display: flex; align-items: center; gap: 6px; }
+.appearance-segments { position: relative; isolation: isolate; flex: 1; padding: 3px; gap: 0; background: color-mix(in srgb, var(--muted) 14%, transparent); border-radius: 15px; }
+.appearance-thumb { position: absolute; inset: 3px auto 3px 3px; width: calc(50% - 3px); background: var(--surface); border-radius: 12px; box-shadow: 0 1px 4px #0002; transition: transform 310ms var(--settle); }
+.appearance-segments[data-dark="true"] .appearance-thumb { transform: translateX(100%); }
+.project-menu .appearance-row button { position: relative; justify-content: center; gap: 5px; width: auto; min-height: 36px; border-radius: 12px; }
+.project-menu .appearance-segments button { flex: 1; background: transparent; padding: 0 7px; }
+.project-menu .auto-mode { background: transparent; color: var(--muted); transition: background-color 200ms, color 200ms; }
+.project-menu .auto-mode[aria-pressed="true"] { color: var(--accent); background: var(--tint); }
+[data-appearance-reveal]::view-transition-old(root), [data-appearance-reveal]::view-transition-new(root) { mix-blend-mode: normal; animation: none; }
+[data-appearance-reveal]::view-transition-new(root) { animation: spread-theme 530ms cubic-bezier(.24,.6,.26,1) both; }
+@keyframes spread-theme {
+  from { clip-path: circle(0px at var(--reveal-origin)); }
+  to { clip-path: circle(var(--reveal-radius) at var(--reveal-origin)); }
+}
+@media (prefers-reduced-motion: reduce) { .appearance-thumb,.project-menu .auto-mode { transition: none; } }
