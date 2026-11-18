@@ -1,22 +1,12 @@
 import * as L from 'leaflet'
 import { prefersReducedMotion, settle } from './motion'
-import type { FeatureCollection, LineString, MultiLineString } from 'geojson'
+import { cartoSurface } from './cartoSurface'
+import type { FeatureCollection } from 'geojson'
 import type { Basemap } from '../assets/loadAssets'
-
-const areaColors: Record<string, string> = {
-  land: 'var(--map-land, #f6f2eb)',
-  green: 'var(--map-green, #d8e8d5)',
-  water: 'var(--map-water, #cddcf5)',
-}
 
 export function addRegion(map: L.Map, data: FeatureCollection) {
   const region = L.layerGroup().addTo(map)
-  L.geoJSON(data, {
-    pane: 'regional-context', interactive: false,
-    style: feature => feature?.properties?.kind === 'road'
-      ? { color: 'var(--map-artery, #d4c4ad)', weight: 1.25 }
-      : { stroke: false, fillColor: areaColors[feature?.properties?.kind] ?? areaColors.land, fillOpacity: 1 },
-  }).addTo(region)
+  cartoSurface(L.latLngBounds([37.50, -122.70], [38, -122.10]), 'regional-context', data).addTo(region)
   const cities: [string, number, number][] = [
     ['San Francisco', 37.766, -122.444], ['Oakland', 37.805, -122.272],
     ['Berkeley', 37.872, -122.273], ['Daly City', 37.687, -122.47],
@@ -35,24 +25,7 @@ export function addRegion(map: L.Map, data: FeatureCollection) {
 
 export function addBasemap(map: L.Map, data: Basemap) {
   const layers = L.layerGroup()
-  L.geoJSON(data.areas, {
-    interactive: false,
-    style: feature => ({
-      stroke: false,
-      fillColor: areaColors[feature?.properties?.kind] ?? areaColors.land,
-      fillOpacity: 1,
-    }),
-  }).addTo(layers)
-  const streets: L.LatLngTuple[][] = []
-  const mainStreets: L.LatLngTuple[][] = []
-  for (const feature of data.streets.features) {
-    const geometry = feature.geometry as LineString | MultiLineString
-    const segments = geometry.type === 'LineString' ? [geometry.coordinates] : geometry.coordinates
-    const lines = feature.properties?.major ? mainStreets : streets
-    for (const path of segments) lines.push(path.map(([lng, lat]) => [lat, lng]))
-  }
-  L.polyline(streets, { interactive: false, color: 'var(--map-road, #ded8cf)', weight: 1.4 }).addTo(layers)
-  L.polyline(mainStreets, { interactive: false, color: 'var(--map-artery, #d4c4ad)', weight: 2.4 }).addTo(layers)
+  cartoSurface(L.latLngBounds([37.704, -122.525], [37.837, -122.349]), 'city-cartography', data.areas, data.streets).addTo(layers)
 
   const labels = L.layerGroup().addTo(layers)
   function updateLabels() {
