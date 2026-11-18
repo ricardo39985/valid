@@ -156,20 +156,29 @@
 @media (prefers-reduced-motion: reduce) { .app .board, .app .map-legend { transition: none; } }
 
 .remove-dialog {
-  width: min(352px, calc(100vw - 40px)); margin: auto; padding: 24px;
-  border: 1px solid var(--line); border-radius: 24px; color: var(--ink); background: var(--tour-bg);
-  box-shadow: var(--shadow-glass); animation: confirm-in 180ms var(--settle);
+  width: min(352px, calc(100vw - 32px)); margin: auto; padding: 20px;
+  border: 1px solid var(--line); border-radius: 27px; color: var(--ink); background: var(--glass);
+  box-shadow: var(--shadow-glass); backdrop-filter: blur(20px) saturate(145%);
 }
-.remove-dialog::backdrop { background: #10101850; animation: confirm-in 160ms ease-out; }
+.remove-dialog::backdrop { background: #17142442; transition: opacity 240ms ease-out; }
+@starting-style { .remove-dialog[open]::backdrop { opacity: 0; } }
+.remove-dialog[data-closing] { pointer-events: none; }
+.remove-dialog[data-closing]::backdrop { opacity: 0; }
+.remove-icon {
+  display: grid; place-items: center; width: 42px; height: 42px; margin-bottom: 12px;
+  border-radius: 14px; color: var(--accent); background: var(--tint);
+}
 .remove-dialog h2 { margin: 0; font-size: 21px; letter-spacing: -.035em; overflow-wrap: anywhere; }
-.remove-dialog p { margin: 10px 0 20px; color: var(--muted); line-height: 1.45; }
-.remove-actions { display: flex; gap: 8px; }
-.remove-actions button { flex: 1; min-height: 44px; border-radius: 14px; background: var(--tint); color: var(--ink); font-weight: 650; }
-.remove-actions .confirm-remove { background: #b62c40; color: white; }
-@keyframes confirm-in { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .remove-dialog, .remove-dialog::backdrop { animation-duration: 60ms; } }
-
-.remove-dialog[data-closing]::backdrop { opacity: 0; transition: opacity 140ms ease-out; }
+.remove-dialog p { margin: 8px 0 20px; color: var(--muted); line-height: 1.45; }
+.remove-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.remove-actions button {
+  flex: 1; min-height: 44px; padding: 6px 12px; border: 1px solid var(--line);
+  border-radius: 22px; background: var(--surface); color: var(--ink); font-weight: 650;
+}
+.remove-actions .confirm-remove { background: #a5253a; border-color: transparent; color: white; }
+.remove-actions button:hover { background: var(--tint); }
+.remove-actions .confirm-remove:hover { background: #8d1f31; }
+@media (prefers-reduced-motion: reduce) { .remove-dialog::backdrop { transition: none; } }
 
 .launch-scene {
   position: fixed; inset: 0; z-index: 650; display: grid; place-items: center;

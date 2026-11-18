@@ -5,6 +5,36 @@ function transformBetween(from: DOMRect, to: DOMRect) {
   return `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`
 }
 
+export function animateAnchoredSurface(element: HTMLElement, anchor: HTMLElement, opening = true) {
+  const box = element.getBoundingClientRect()
+  const target = anchor.getBoundingClientRect()
+  const dx = target.left + target.width / 2 - box.left - box.width / 2
+  const dy = target.top + target.height / 2 - box.top - box.height / 2
+  const cutX = Math.max(0, (box.width - target.width) / 2)
+  const cutY = Math.max(0, (box.height - target.height) / 2)
+  const radius = getComputedStyle(element).borderRadius
+  const duration = 360
+  const timing: KeyframeAnimationOptions = { duration, fill: 'both' }
+  // Move a full-size surface through a shrinking window. Letterforms never scale.
+  const shell = element.animate([
+    { transform: `translate(${dx}px, ${dy}px)`, clipPath: `inset(${cutY}px ${cutX}px round ${target.height / 2}px)`, easing: 'cubic-bezier(.3,0,.18,1)' },
+    { transform: 'translate(0, 0)', clipPath: `inset(0px 0px round ${radius})`, offset: .84 },
+    { transform: 'translate(0, 0)', clipPath: `inset(-36px -36px round ${radius})` },
+  ], timing)
+  const surface = element.animate([{ opacity: 0 }, { opacity: 1, offset: .32 }, { opacity: 1 }], timing)
+  const content = element.firstElementChild!.animate([
+    { opacity: 0 }, { opacity: 0, offset: .32 }, { opacity: 1, offset: .83 }, { opacity: 1 },
+  ], timing)
+  const motions = [shell, surface, content]
+  if (!opening) {
+    for (const motion of motions) {
+      motion.currentTime = duration
+      motion.reverse()
+    }
+  }
+  return motions
+}
+
 export function useAnchoredPanel(open: boolean, anchor: RefObject<HTMLButtonElement | null>) {
   const panel = useRef<HTMLDivElement>(null)
   const running = useRef<Animation[]>([])
@@ -26,26 +56,7 @@ export function useAnchoredPanel(open: boolean, anchor: RefObject<HTMLButtonElem
     element.dataset.visible = 'true'
 
     if (!running.current.length) {
-      const box = element.getBoundingClientRect()
-      const target = button.getBoundingClientRect()
-      const dx = target.left + target.width / 2 - box.left - box.width / 2
-      const dy = target.top + target.height / 2 - box.top - box.height / 2
-      const cutX = Math.max(0, (box.width - target.width) / 2)
-      const cutY = Math.max(0, (box.height - target.height) / 2)
-      const radius = getComputedStyle(element).borderRadius
-      const timing: KeyframeAnimationOptions = { duration: 360, fill: 'both' }
-      // Move a full-size surface through a shrinking window. Letterforms never scale.
-      const shell = element.animate([
-        { transform: `translate(${dx}px, ${dy}px)`, clipPath: `inset(${cutY}px ${cutX}px round ${target.height / 2}px)`, easing: 'cubic-bezier(.3,0,.18,1)' },
-        { transform: 'translate(0, 0)', clipPath: `inset(0px 0px round ${radius})`, offset: .84 },
-        { transform: 'translate(0, 0)', clipPath: `inset(-36px -36px round ${radius})` },
-      ], timing)
-      const surface = element.animate([{ opacity: 0 }, { opacity: 1, offset: .32 }, { opacity: 1 }], timing)
-      const content = element.firstElementChild!.animate([
-        { opacity: 0 }, { opacity: 0, offset: .32 }, { opacity: 1, offset: .83 }, { opacity: 1 },
-      ], timing)
-      running.current = [shell, surface, content]
-      if (!open) for (const motion of running.current) motion.currentTime = 360
+      running.current = animateAnchoredSurface(element, button, open)
     }
     for (const motion of running.current) {
       motion.playbackRate = open ? 1 : -1

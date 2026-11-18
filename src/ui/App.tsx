@@ -67,7 +67,7 @@ export default function App() {
   const [listRevision, setListRevision] = useState(0)
   const [selected, setSelected] = useState<Destination | null>(null)
   const [message, setMessage] = useState('')
-  const [removal, setRemoval] = useState<Address | null>(null)
+  const [removal, setRemoval] = useState<{ address: Address; trigger: HTMLButtonElement } | null>(null)
   const addressList = useRef<HTMLUListElement>(null)
 
   const listButton = useRef<HTMLButtonElement>(null)
@@ -352,7 +352,7 @@ export default function App() {
                       setMessage('')
                       setEditing(i)
                     }}><Pencil size={14} /></button>
-                    <button type="button" aria-label={`Remove ${home.address[0]}`} onClick={() => setRemoval(home.address)}><X size={16} /></button>
+                    <button type="button" aria-label={`Remove ${home.address[0]}`} onClick={event => setRemoval({ address: home.address, trigger: event.currentTarget })}><X size={16} /></button>
                   </div>
                 </li>
               })}
@@ -365,11 +365,10 @@ export default function App() {
         </aside>
         {launching && !tour && <LaunchScene ready={startupReady} failed={startupFailed} onRetry={retryStartup} onFinish={finishLaunch} />}
       </main>
-      {removal && <RemoveAddressDialog address={removal[0]} onDismiss={() => {
+      {removal && <RemoveAddressDialog address={removal.address[0]} trigger={removal.trigger} onDismiss={() => {
         flushSync(() => setRemoval(null))
-        const index = homes.findIndex(home => home.address === removal)
-        addressList.current?.children[index]?.querySelector<HTMLButtonElement>('.row-actions button:last-child')?.focus({ preventScroll: true })
-      }} onRemove={() => void removeAddress(removal)} />}
+        removal.trigger.focus({ preventScroll: true })
+      }} onRemove={() => void removeAddress(removal.address)} />}
       {tour && <Onboarding intro={launching} ready={startupReady} failed={startupFailed} onRetry={retryStartup} onIntroDone={finishLaunch} onDone={finishTour} />}
     </div>
   )
