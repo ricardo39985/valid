@@ -7,10 +7,14 @@ type Props = {
   index: ReturnType<typeof buildAddressIndex>
   disabled: boolean
   onChoose: (address: Address) => void
+  placeholder?: string
+  initialValue?: string
+  autoFocus?: boolean
 }
 
-export default function AddressSearch({ index, disabled, onChoose }: Props) {
-  const [query, setQuery] = useState('')
+export default function AddressSearch({ index, disabled, onChoose, placeholder = 'Enter a San Francisco address',
+  initialValue = '', autoFocus = false }: Props) {
+  const [query, setQuery] = useState(initialValue)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
   const listId = useId()
@@ -27,7 +31,7 @@ export default function AddressSearch({ index, disabled, onChoose }: Props) {
   return <div className="address-search">
     <div className="search-field">
       <Search size={20} aria-hidden="true" />
-      <input aria-label="San Francisco street address" placeholder="Enter a San Francisco address"
+      <input aria-label={initialValue ? 'Replacement San Francisco address' : 'San Francisco street address'} placeholder={placeholder} autoFocus={autoFocus}
         autoComplete="off" value={query} disabled={disabled} role="combobox"
         aria-autocomplete="list" aria-expanded={visible && suggestions.length > 0} aria-controls={listId}
         aria-activedescendant={visible && active >= 0 ? `${listId}-${active}` : undefined}

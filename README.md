@@ -2,7 +2,7 @@
 
 Before You Sign helps San Francisco renters compare up to five addresses by showing what they can walk to from each one.
 
-Apartment listings tell you what's inside. I wanted to see what an ordinary Tuesday would look like outside: where I'd buy groceries, catch the bus, or get coffee. Enter a street address or choose **Surprise me** for two to compare. Change the walking limit or pick a category, then tap either address card to switch the map.
+Apartment listings tell you what's inside. I wanted to see what an ordinary Tuesday would look like outside: where I'd buy groceries, catch the bus, or get coffee. Enter a street address or choose **Surprise me** for two to compare. Add more from the map search bar. Tap an address card to switch the map, or open List for category counts and the shortest walks.
 
 ## Run it
 
@@ -28,7 +28,7 @@ The production build is in `dist/`. The city dataset and basemap ship with the r
 
 The app uses Overture's **2026-10-21.0** release for street addresses, destinations, transit infrastructure, and the walking network. The graph joins road segments by Overture connector IDs. Each address gets one bounded shortest-path search for the longest supported walk. Shorter limits and category changes reuse those results.
 
-Walking estimates assume 80 meters per minute. Addresses and destinations snap to nearby graph connectors, and the estimate includes the distance to those connectors. The straight approaches are approximate. The app excludes roads outside its pedestrian class allowlist and applies mapped foot access denials. It doesn't model hills, crossing delays, closures, or step-free access. Transit results show mapped stops and stations. Service and schedules are outside scope.
+Walking estimates assume 80 meters per minute. Addresses and destinations snap to nearby graph connectors, and the estimate includes the distance to those connectors. Where the mapped street supports it, the map draws the final approach perpendicular to the street. Those short approaches are estimates, since the source data doesn’t consistently identify building entrances. The app excludes roads outside its pedestrian class allowlist and applies mapped foot access denials. It doesn't model hills, crossing delays, closures, or step-free access. Transit results show mapped stops and stations. Service and schedules are outside scope.
 
 I kept the first city to San Francisco and the shortlist to five addresses. The map shows one address's routes at a time, while the other results stay in the comparison panel. There are no accounts, listings, overall scores, or live business hours. The city extract includes a simplified basemap derived from Overture streets, coastline, parks, and water. The static app has no runtime tile service or WebGL requirement.
 

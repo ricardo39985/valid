@@ -1,5 +1,5 @@
-import { Building2, ChevronDown, Footprints, List, MapPin, Plus, Shuffle, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Building2, ChevronDown, Footprints, List, MapPin, Pencil, Shuffle, X } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { buildAddressIndex } from '../data'
 import { loadCity, type City } from '../assets/loadAssets'
 import WalkMap from '../map/WalkMap'
@@ -7,6 +7,7 @@ import type { Address, CategoryFilter, Destination } from '../routing/types'
 import { createRouter, filterDestinations, routeSegments } from '../routing/walk'
 import AddressSearch from './AddressSearch'
 import AddressFocusRing from './AddressFocusRing'
+import NearbyList from './NearbyList'
 import { prefersReducedMotion } from '../map/motion'
 import { categories, homeColors, letters, sharedColor } from './categories'
 
@@ -24,10 +25,23 @@ export default function App() {
   const [focus, setFocus] = useState(0)
   const [minutes, setMinutes] = useState(10)
   const [category, setCategory] = useState<CategoryFilter>('all')
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditing] = useState<number | null>(null)
+  const [cluster, setCluster] = useState<Destination[] | null>(null)
   const [listOpen, setListOpen] = useState(false)
+  const [listRevision, setListRevision] = useState(0)
   const [selected, setSelected] = useState<Destination | null>(null)
   const [message, setMessage] = useState('')
+  const rail = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const container = rail.current
+    const card = container?.querySelectorAll('.address-card-wrap')[focus]
+    if (!container || !card || container.scrollWidth <= container.clientWidth) return
+    const offset = card.getBoundingClientRect().left - container.getBoundingClientRect().left
+    if (offset < 0 || offset + card.clientWidth > container.clientWidth) {
+      container.scrollBy({ left: offset - 10, behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
+    }
+  }, [focus, homes.length])
 
   useEffect(() => {
     let current = true
@@ -42,7 +56,7 @@ export default function App() {
   const nearby = useMemo(() => homes.map(home =>
     filterDestinations(home.destinations, category, minutes)), [homes, category, minutes])
   const destinations = nearby[focus]
-  const mapDestinations = useMemo(() => selected ? [selected] : destinations ?? [], [selected, destinations])
+  const mapDestinations = useMemo(() => selected ? [selected] : destinations ?? noDestinations, [selected, destinations])
   const segments = useMemo(() => active && city
     ? routeSegments(city.network, active.address, mapDestinations) : [], [active, city, mapDestinations])
 
@@ -50,21 +64,47 @@ export default function App() {
     setSelected(current => current === destination ? null : destination)
   }, [])
 
+  const showCluster = useCallback((items: Destination[]) => {
+    setCluster(items)
+    setListOpen(true)
+  }, [])
+
+  function toggleList() {
+    setCluster(null)
+    if (!listOpen) setListRevision(value => value + 1)
+    setListOpen(!listOpen)
+  }
+
   const closePlace = useCallback(() => setSelected(null), [])
 
   function pickAddress(address: Address) {
     const existing = homes.findIndex(home => home.address === address)
     setSelected(null)
+    setCluster(null)
     setMessage('')
     if (existing !== -1) {
       setFocus(existing)
-      setEditing(false)
+      setEditing(null)
       return
     }
     if (!walkFrom || homes.length >= maxAddresses) return
     setHomes([...homes, { address, destinations: walkFrom(address, 20) }])
     setFocus(homes.length)
-    setEditing(false)
+    setEditing(null)
+  }
+
+  function replaceAddress(address: Address) {
+    if (editing === null || !walkFrom) return
+    if (homes.some((home, i) => i !== editing && home.address === address)) {
+      setMessage('That address is already in your comparison.')
+      return
+    }
+    setHomes(homes.map((home, i) => i === editing ? { address, destinations: walkFrom(address, 20) } : home))
+    setFocus(editing)
+    setEditing(null)
+    setMessage('')
+    setCluster(null)
+    setSelected(null)
   }
 
   function randomHome(excluded: Address[]) {
@@ -93,16 +133,20 @@ export default function App() {
     setHomes(second ? [first, second] : [first])
     setFocus(0)
     setSelected(null)
+    setCluster(null)
     setMessage('')
   }
 
   function removeAddress(at: number) {
+    setEditing(null)
+    setCluster(null)
     setHomes(homes.filter((_, index) => index !== at))
     setFocus(focus > at ? focus - 1 : Math.min(focus, Math.max(0, homes.length - 2)))
     setSelected(null)
   }
 
   function focusAddress(at: number) {
+    setCluster(null)
     setFocus(at)
     setSelected(null)
   }
@@ -110,24 +154,27 @@ export default function App() {
   const CategoryIcon = categories[category].icon
 
   return (
-    <div className={`app ${active ? 'has-results' : 'start'}`}>
+    <div className={`app ${active ? 'has-results' : 'start'} ${listOpen ? 'list-open' : ''}`}>
       <header className="topbar">
         <div className="wordmark"><span><Building2 size={20} /></span>Before You Sign</div>
         <div className="city-label">San Francisco<span> · </span><span className="city-region">California</span></div>
-        {active && <button className="text-button" aria-expanded={editing} onClick={() => setEditing(!editing)}>
-          {editing ? 'Done' : 'Edit addresses'}
-        </button>}
+
       </header>
 
       <main className="workspace">
         <div className="map-region">
           <WalkMap address={active?.address} homeIndex={focus} segments={segments}
-            destinations={destinations ?? noDestinations} selected={selected} onSelect={selectPlace} onClose={closePlace} />
-          {active && <div className="map-toolbar">
+            destinations={mapDestinations} framing={destinations ?? noDestinations} selected={selected}
+            onCluster={showCluster} onSelect={selectPlace} onClose={closePlace} />
+          {active && <div className="map-chrome">
+            <AddressSearch index={index} disabled={!city || homes.length >= maxAddresses} onChoose={pickAddress}
+              placeholder={homes.length >= maxAddresses ? 'Five addresses added' : 'Add a San Francisco address'} />
+            <div className="map-toolbar">
             <label className="glass-select"><CategoryIcon size={17} style={{ color: categories[category].color }} aria-hidden="true" />
               <select aria-label="Destination category" value={category} onChange={event => {
                 setCategory(event.target.value as CategoryFilter)
                 setSelected(null)
+                setCluster(null)
               }}>
                 {Object.entries(categories).map(([value, entry]) => <option key={value} value={value}>{entry.label}</option>)}
               </select><ChevronDown size={15} aria-hidden="true" /></label>
@@ -135,9 +182,20 @@ export default function App() {
               <select aria-label="Maximum walking time" value={minutes} onChange={event => {
                 setMinutes(Number(event.target.value))
                 setSelected(null)
+                setCluster(null)
               }}>
                 {walkLimits.map(limit => <option key={limit} value={limit}>{limit} min walk</option>)}
               </select><ChevronDown size={15} aria-hidden="true" /></label>
+            </div>
+          </div>}
+          {editing !== null && homes[editing] && <div className="map-editor" role="dialog" aria-label="Edit address"
+            onKeyDown={event => { if (event.key === 'Escape') { setEditing(null); setMessage('') } }}>
+            <div className="editor-title"><strong>Edit {homes[editing].address[0]}</strong>
+              <button className="icon-button" aria-label="Close address editor" onClick={() => { setEditing(null); setMessage('') }}><X size={18} /></button>
+            </div>
+            <AddressSearch key={editing} initialValue={homes[editing].address[0]} autoFocus
+              index={index} disabled={!city} onChoose={replaceAddress} />
+            {message && <p role="status" className="status">{message}</p>}
           </div>}
           {active && !selected && <div className="map-legend" aria-label="Map legend">
             {category === 'all' && <>
@@ -165,19 +223,39 @@ export default function App() {
             }}>Try again</button></div>}
             {message && <p role="status" className="status">{message}</p>}
           </div> : <>
+            <button className="sheet-handle" type="button" aria-label={listOpen ? 'Collapse nearby places' : 'Expand nearby places'}
+              aria-expanded={listOpen} aria-controls="nearby-panel" onClick={toggleList}><span /></button>
             <div className="board-heading">
               <div>
                 {homes.length > 1 && <p className="comparison-label">Compare {homes.length} addresses</p>}
                 <h1 key={active.address[0] + category} className="focus-heading">{category === 'all' ? active.address[0] : `${categories[category].label} near ${active.address[0]}`}</h1>
               </div>
-              <button className="subtle-button" aria-expanded={listOpen} onClick={() => setListOpen(!listOpen)}>
+              <button className="subtle-button" aria-expanded={listOpen} aria-controls="nearby-panel"
+                onClick={toggleList}>
                 <List size={17} />{listOpen ? 'Hide list' : 'List'}
               </button>
             </div>
 
-            <div className={`address-cards ${homes.length === 1 ? 'single-card' : ''}`}
+            <div id="nearby-panel" className="list-drawer" aria-hidden={!listOpen} inert={!listOpen}>
+              <div className="list-drawer-content">
+                <div className="nearby-panel-heading">
+                  <strong>Nearby places</strong>
+                  <button className="icon-button" aria-label="Close nearby places" onClick={() => setListOpen(false)}><X size={17} /></button>
+                </div>
+                {cluster && <div className="cluster-list-heading">
+                  <strong>{cluster.length} places in this group</strong>
+                  <button className="text-button" onClick={() => setCluster(null)}>View all places</button>
+                </div>}
+                <NearbyList key={active.address[0] + category + minutes + listRevision + (cluster ? cluster.map(item => item.place[0]).join() : "")}
+                  items={cluster ?? destinations ?? noDestinations} selected={selected} showGroup={!!cluster} onSelect={destination => {
+                  selectPlace(destination)
+                  if (window.matchMedia('(max-width: 860px)').matches) setListOpen(false)
+                }} />
+              </div>
+            </div>
+            <div className="address-rail" ref={rail}><div className={`address-cards ${homes.length === 1 ? 'single-card' : ''}`}
               style={{ '--focus-color': homeColors[focus] } as React.CSSProperties}>
-              <AddressFocusRing activeIndex={focus} count={homes.length} editing={editing} />
+              <AddressFocusRing activeIndex={focus} count={homes.length} editing={editing !== null} />
               {homes.map((home, i) => {
                 const results = nearby[i]
                 const isActive = focus === i
@@ -190,37 +268,20 @@ export default function App() {
                       results.length ? `${results.length} nearby` : 'within range'}</span>
                     <span className="on-map">{isActive && <><MapPin size={12} />On map</>}</span>
                   </button>
-                  {editing && <button className="remove-address icon-button" aria-label={`Remove ${home.address[0]}`}
-                    onClick={() => removeAddress(i)}><X size={16} /></button>}
+                  <div className="card-actions">
+                    <button type="button" aria-label={`Edit ${home.address[0]}`} onClick={() => {
+                      focusAddress(i)
+                      setListOpen(false)
+                      setMessage('')
+                      setEditing(i)
+                    }}><Pencil size={14} /></button>
+                    <button type="button" aria-label={`Remove ${home.address[0]}`} onClick={() => removeAddress(i)}><X size={16} /></button>
+                  </div>
                 </div>
               })}
-            </div>
+            </div></div>
 
-            {editing ? (homes.length < maxAddresses && <div className="edit-controls">
-              <AddressSearch index={index} disabled={!city} onChoose={pickAddress} />
-              <button className="surprise" onClick={surprise}><Shuffle size={16} />Add a random address</button>
-              {message && <p className="status" role="status">{message}</p>}
-            </div>) : homes.length < maxAddresses && <button className="add-address" onClick={() => setEditing(true)}>
-              <Plus size={18} />{homes.length === 1 ? 'Compare another address' : 'Add an address'}
-            </button>}
-
-            {!destinations?.length && <p className="status">Nothing mapped within this walk time. Try a longer walk or another category.</p>}
-
-            {listOpen && !!destinations?.length && <ul className="place-list fresh-list" aria-label="Nearby places">
-              {destinations.map((destination, i) => {
-                const { place, minutes } = destination
-                const entry = categories[place[1]]
-                return <li key={place[0] + i}><button aria-pressed={selected === destination} onClick={() => {
-                  if (selected !== destination && window.matchMedia('(max-width: 860px)').matches) {
-                    document.querySelector('.map-region')?.scrollIntoView({ behavior: prefersReducedMotion() ? 'instant' : 'smooth', block: 'start' })
-                  }
-                  selectPlace(destination)
-                }}>
-                  <span className="list-icon" style={{ color: entry.color }}><entry.icon size={18} /></span>
-                  <span>{place[0]}<small>{entry.label}</small></span><strong>{minutes} min</strong>
-                </button></li>
-              })}
-            </ul>}
+            {!destinations?.length && !listOpen && <p className="status">Nothing mapped within this walk time. Try a longer walk or another category.</p>}
             <p className="method-note">Estimated walking times · Overture Maps {city?.network.release}</p>
           </>}
         </aside>

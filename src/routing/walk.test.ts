@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createRouter, filterDestinations, routeSegments } from './walk'
-import type { Address, Network } from './types'
+import type { Address, Destination, Network } from './types'
 
 const home: Address = ['100 Test St', [0, 0], 0, 0, '94107']
 const network: Network = {
@@ -32,4 +32,20 @@ test('includes off-network access in the walk estimate', () => {
   const offsetHome: Address = ['100 Test St', [0, 0], 0, 25, '94107']
   assert.equal(createRouter(network)(offsetHome, 2).length, 0)
   assert.equal(createRouter(network)(offsetHome, 3)[0].minutes, 3)
+})
+
+test('approaches destinations perpendicular to their mapped street', () => {
+  const road: Network = {
+    ...network,
+    nodes: [[-122.45, 37.75], [-122.44, 37.75]],
+    edges: [[0, 1, 880, []]],
+    places: [],
+  }
+  const address: Address = ['100 Test St', [-122.448, 37.7502], 0, 80, '94107']
+  const destination: Destination = { place: ['Market', 'groceries', [-122.442, 37.7503], 1, 60], minutes: 13, edges: [0] }
+  const result = routeSegments(road, address, [{ ...destination, place: [...destination.place] }])
+  assert.deepEqual(result.slice(1).map(segment => segment.coordinates[0][1]), [37.75, 37.75])
+  for (const segment of result.slice(1)) {
+    assert.ok(Math.abs(segment.coordinates[0][0] - segment.coordinates[1][0]) < 1e-8)
+  }
 })

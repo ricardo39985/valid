@@ -1,3 +1,4 @@
+import { perpendicularApproach } from './approach'
 import type { Address, Category, CategoryFilter, Destination, Network, RouteSegment } from './types'
 
 const METERS_PER_MINUTE = 80
@@ -76,10 +77,14 @@ export function routeSegments(network: Network, address: Address, destinations: 
     return { category: segmentCategory(values), coordinates: [network.nodes[start], ...interior, network.nodes[end]] }
   })
   if (address[3] > 0) {
-    segments.push({ category: segmentCategory(categories), coordinates: [address[1], network.nodes[address[2]]] })
+    const exits = new Set(destinations.flatMap(({ edges }) => edges.length ? [edges[edges.length - 1]] : []))
+    const approach = perpendicularApproach(network, address[1], [...exits])
+    if (approach) segments.push({ category: segmentCategory(categories), coordinates: approach })
   }
-  for (const { place } of destinations) {
-    if (place[4] > 0) segments.push({ category: place[1], coordinates: [network.nodes[place[3]], place[2]] })
+  for (const { place, edges } of destinations) {
+    if (!place[4]) continue
+    const approach = perpendicularApproach(network, place[2], edges.slice(0, 1))
+    if (approach) segments.push({ category: place[1], coordinates: approach })
   }
   return segments
 }

@@ -6,7 +6,8 @@ import { loadBasemap } from '../assets/loadAssets'
 import type { Address, Coordinate, Destination, RouteSegment } from '../routing/types'
 import { categories, homeColors, letters } from '../ui/categories'
 import { addBasemap } from './basemap'
-import { enterMapFeature, prefersReducedMotion, settle } from './motion'
+import { enterMapFeature, prefersReducedMotion } from './motion'
+import { clusterPins } from './cluster'
 import PlaceCallout from './PlaceCallout'
 import { addRoutes, fadeRoutes } from './routeLayers'
 import 'leaflet/dist/leaflet.css'
@@ -23,6 +24,8 @@ type Props = {
   homeIndex: number
   destinations: Destination[]
   segments: RouteSegment[]
+  framing: Destination[]
+  onCluster: (destinations: Destination[]) => void
   selected: Destination | null
   onSelect: (destination: Destination) => void
   onClose: () => void
@@ -30,10 +33,12 @@ type Props = {
 
 type Pin = { button: HTMLButtonElement; marker: L.Marker }
 
-export default function WalkMap({ address, homeIndex, destinations, segments, selected, onSelect, onClose }: Props) {
+export default function WalkMap({ address, homeIndex, destinations, segments, framing, onCluster, selected, onSelect, onClose }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const pins = useRef(new Map<Destination, Pin>())
+  const frameDestinations = useRef(framing)
+  useLayoutEffect(() => { frameDestinations.current = framing }, [framing])
   const routes = useRef<ReturnType<typeof addRoutes> | null>(null)
   const cancelRouteExit = useRef<(() => void) | null>(null)
   const popup = useRef<L.Popup | null>(null)
@@ -49,7 +54,7 @@ export default function WalkMap({ address, homeIndex, destinations, segments, se
     try {
       instance = L.map(container.current, {
         center: initialCenter, zoom: 12, minZoom: 11, maxZoom: 18, zoomSnap: .5,
-        maxBounds: sanFrancisco, maxBoundsViscosity: .65, zoomControl: false,
+        maxBounds: sanFrancisco, maxBoundsViscosity: .65, zoomControl: false, renderer: L.svg({ padding: .45 }),
       })
     } catch (error) {
       console.error(error)
@@ -108,29 +113,28 @@ export default function WalkMap({ address, homeIndex, destinations, segments, se
     routes.current = segments.length ? addRoutes(instance, segments) : null
   }, [ready, segments])
 
-  useLayoutEffect(() => {
+  const fitAddress = useCallback(() => {
     const instance = map.current
-    if (!ready || !instance) return
+    if (!address || !instance) return
     instance.stop().invalidateSize({ animate: false })
-    const target = address ? toLatLng(address[1]) : initialCenter
-    const zoom = address ? 14.5 : 12
-    const size = instance.getSize()
-    const currentCenter = size.divideBy(2)
-    const nextCenter = instance.latLngToContainerPoint(target)
-    const reducedMotion = prefersReducedMotion()
-    const fitsCurrentView = instance.getZoom() === zoom
-      && Math.abs(currentCenter.x - nextCenter.x) < size.x * .7
-      && Math.abs(currentCenter.y - nextCenter.y) < size.y * .7
-    if (!reducedMotion && fitsCurrentView) {
-      instance.panTo(target, { animate: true, duration: .36, easeLinearity: .28 })
-    } else {
-      instance.setView(target, zoom, { animate: false })
-      const animation = reducedMotion ? undefined : container.current?.animate?.(
-        [{ opacity: .52 }, { opacity: 1 }], { duration: 240, easing: settle },
-      )
-      return () => animation?.cancel()
+    const points = [toLatLng(address[1]), ...frameDestinations.current.map(item => toLatLng(item.place[2]))]
+    const bounds = L.latLngBounds(points)
+    const onPhone = window.matchMedia('(max-width: 860px)').matches
+    const height = instance.getSize().y
+    const options: L.FitBoundsOptions = {
+      maxZoom: 16, paddingTopLeft: L.point(30, 150),
+      paddingBottomRight: L.point(52, onPhone ? Math.min(248, Math.floor(height * .37)) : 72),
+      animate: !prefersReducedMotion(), duration: .72,
     }
-  }, [ready, address])
+    if (options.animate) instance.flyToBounds(bounds, options)
+    else instance.fitBounds(bounds, options)
+  }, [address])
+
+  useLayoutEffect(() => {
+    if (!ready) return
+    if (address) fitAddress()
+    else map.current?.setView(initialCenter, 12, { animate: false })
+  }, [ready, address, fitAddress])
 
   useEffect(() => {
     const instance = map.current
@@ -158,40 +162,67 @@ export default function WalkMap({ address, homeIndex, destinations, segments, se
   useEffect(() => {
     const instance = map.current
     if (!ready || !instance) return
-    const retained = new Set(destinations)
-    for (const [destination, pin] of pins.current) {
-      if (retained.has(destination)) continue
-      pin.marker.remove()
-      pins.current.delete(destination)
+    const clusters = L.layerGroup().addTo(instance)
+    function renderPins() {
+      if (!instance) return
+      clusters.clearLayers()
+      const projected = clusterPins(destinations, item => instance.latLngToContainerPoint(toLatLng(item.place[2])))
+      const singles = new Set(projected.filter(group => group.members.length === 1).map(group => group.members[0]))
+      for (const [destination, pin] of pins.current) {
+        if (singles.has(destination)) continue
+        pin.marker.remove()
+        pins.current.delete(destination)
+      }
+      let added = 0
+      for (const group of projected) {
+        const [destination] = group.members
+        if (group.members.length === 1 && pins.current.has(destination)) continue
+        const { place, minutes } = destination
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = group.members.length === 1 ? 'place-marker' : 'cluster-marker'
+        L.DomEvent.disableClickPropagation(button)
+        if (group.members.length > 1) {
+          button.textContent = String(group.members.length)
+          button.setAttribute('aria-label', `Show ${group.members.length} nearby places`)
+          button.addEventListener('click', () => {
+            if (instance.getZoom() >= 17) onCluster(group.members)
+            else {
+              const center = instance.containerPointToLatLng(L.point(group.point.x, group.point.y))
+              if (prefersReducedMotion()) instance.setView(center, instance.getZoom() + 1.5)
+              else instance.flyTo(center, instance.getZoom() + 1.5, { duration: .42 })
+            }
+          })
+          L.marker(instance.containerPointToLatLng(L.point(group.point.x, group.point.y)), {
+            icon: L.divIcon({ className: 'marker-anchor', html: button, iconSize: [34, 34], iconAnchor: [17, 17] }),
+            keyboard: false, interactive: false,
+          }).addTo(clusters)
+          continue
+        }
+        button.style.setProperty('--pin', categories[place[1]].color)
+        button.setAttribute('aria-label', `${place[0]}, ${minutes} minute walk`)
+        button.setAttribute('aria-pressed', String(destination === selected))
+        button.innerHTML = placeIcons[place[1]]
+        button.addEventListener('click', () => onSelect(destination))
+        const marker = L.marker(toLatLng(place[2]), {
+          icon: L.divIcon({ className: 'marker-anchor', html: button, iconSize: [29, 29], iconAnchor: [14, 24] }),
+          keyboard: false, interactive: false,
+        }).addTo(instance)
+        pins.current.set(destination, { button, marker })
+        enterMapFeature(button, Math.min(added++, 8) * 11)
+      }
+      for (const [destination, { button, marker }] of pins.current) {
+        button.setAttribute('aria-pressed', String(destination === selected))
+        marker.setZIndexOffset(destination === selected ? 650 : 0)
+      }
     }
-    let added = 0
-    for (const destination of destinations) {
-      if (pins.current.has(destination)) continue
-      const { place, minutes } = destination
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.className = 'place-marker'
-      button.style.setProperty('--pin', categories[place[1]].color)
-      button.setAttribute('aria-label', `${place[0]}, ${minutes} minute walk`)
-      button.setAttribute('aria-pressed', 'false')
-      button.innerHTML = placeIcons[place[1]]
-      L.DomEvent.disableClickPropagation(button)
-      button.addEventListener('click', () => onSelect(destination))
-      const marker = L.marker(toLatLng(place[2]), {
-        icon: L.divIcon({ className: 'marker-anchor', html: button, iconSize: [29, 29], iconAnchor: [14, 24] }),
-        keyboard: false, interactive: false,
-      }).addTo(instance)
-      pins.current.set(destination, { button, marker })
-      enterMapFeature(button, Math.min(added++, 8) * 11)
+    renderPins()
+    instance.on('zoomend', renderPins)
+    return () => {
+      instance.off('zoomend', renderPins)
+      clusters.remove()
     }
-  }, [ready, destinations, onSelect])
-
-  useEffect(() => {
-    for (const [destination, { button, marker }] of pins.current) {
-      button.setAttribute('aria-pressed', String(destination === selected))
-      marker.setZIndexOffset(destination === selected ? 650 : 0)
-    }
-  }, [ready, destinations, selected])
+  }, [ready, destinations, selected, onSelect, onCluster])
 
   const refreshPopup = useCallback(() => popup.current?.update(), [])
   useLayoutEffect(() => {
@@ -200,7 +231,7 @@ export default function WalkMap({ address, homeIndex, destinations, segments, se
     const card = L.popup({
       className: 'pin-popup', closeButton: false, closeOnClick: false, closeOnEscapeKey: false,
       offset: L.point(0, -29), autoPanPaddingTopLeft: L.point(14, 100),
-      autoPanPaddingBottomRight: L.point(14, 45), maxWidth: 268, minWidth: 208,
+      autoPanPaddingBottomRight: L.point(14, window.matchMedia('(max-width: 860px)').matches ? 220 : 45), maxWidth: 268, minWidth: 208,
     }).setLatLng(toLatLng(selected.place[2])).setContent(popupHost).openOn(instance)
     popup.current = card
     instance.on('click', onClose)
@@ -225,9 +256,6 @@ export default function WalkMap({ address, homeIndex, destinations, segments, se
     onClose()
   }, [onClose, selected])
 
-  function centerMap() {
-    if (address) map.current?.stop().panTo(toLatLng(address[1]), { animate: !prefersReducedMotion() })
-  }
 
   return (
     <section className="map" aria-label="Neighborhood map">
@@ -239,7 +267,7 @@ export default function WalkMap({ address, homeIndex, destinations, segments, se
         <button className="text-button" onClick={() => { setBaseError(false); setAttempt(value => value + 1) }}>Try again</button>
       </div>}
       {ready && <div className="map-buttons">
-        {address && <button title="Center on address" aria-label="Center on address" onClick={centerMap}><LocateFixed size={18} /></button>}
+        {address && <button title="Center on address" aria-label="Center on address" onClick={fitAddress}><LocateFixed size={18} /></button>}
         <button title="Zoom in" aria-label="Zoom in" onClick={() => map.current?.zoomIn(1, { animate: !prefersReducedMotion() })}><Plus size={18} /></button>
         <button title="Zoom out" aria-label="Zoom out" onClick={() => map.current?.zoomOut(1, { animate: !prefersReducedMotion() })}><Minus size={18} /></button>
       </div>}
