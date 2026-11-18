@@ -1,0 +1,9 @@
+export type Coordinate = [longitude: number, latitude: number]
+export type Category = 'groceries' | 'transit' | 'pharmacy' | 'parks' | 'cafes'
+export type CategoryFilter = Category | 'all'
+export type Address = [label: string, position: Coordinate, node: number, accessMeters: number, postalCode: string]
+export type Place = [name: string, category: Category, position: Coordinate, node: number, accessMeters: number]
+export type Edge = [start: number, end: number, meters: number, interior: Coordinate[]]
+export type Network = { release: string; nodes: Coordinate[]; edges: Edge[]; places: Place[] }
+export type Destination = { place: Place; minutes: number; edges: number[] }
+export type RouteSegment = { category: Category | 'shared'; coordinates: Coordinate[] }

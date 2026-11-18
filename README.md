@@ -1,3 +1,44 @@
 # Before You Sign
 
-Compare what you can walk to from the San Francisco homes on your shortlist.
+Before You Sign helps San Francisco renters compare up to five addresses by showing what they can walk to from each one.
+
+Apartment listings tell you what's inside. I wanted to see what an ordinary Tuesday would look like outside: where I'd buy groceries, catch the bus, or get coffee. Enter a street address or choose **Surprise me** for two to compare. Change the walking limit or pick a category, then tap either address card to switch the map.
+
+## Run it
+
+Use Node 24.
+
+```sh
+npm ci
+npm run dev
+npm test
+npm run build
+```
+
+The production build is in `dist/`. Both city files ship with the repo, so running the app doesn't require data credentials or a separate server.
+
+## How it fits together
+
+- `src/ui/` contains address entry, filters, and the comparison panel.
+- `src/map/` draws the destinations and routes in MapLibre.
+- `src/routing/` finds reachable destinations and groups shared paths. A shared street segment gets one color, then the branches take the colors of the places they lead to.
+- `scripts/` extracts and prepares the Overture data.
+
+## Data and trade-offs
+
+The app uses Overture's **2026-10-21.0** release for street addresses, destinations, transit infrastructure, and the walking network. The graph joins road segments by Overture connector IDs. Each address gets one bounded shortest-path search for the longest supported walk. Shorter limits and category changes reuse those results.
+
+Walking estimates assume 80 meters per minute. Addresses and destinations snap to nearby graph connectors, and the estimate includes the distance to those connectors. The straight approaches are approximate. The app excludes roads outside its pedestrian class allowlist and applies mapped foot access denials. It doesn't model hills, crossing delays, closures, or step-free access. Transit results show mapped stops and stations. Service and schedules are outside scope.
+
+I kept the first city to San Francisco and the shortlist to five addresses. The map shows one address's routes at a time, while the other results stay in the comparison panel. There are no accounts, listings, overall scores, or live business hours. The roughly 5 MB compressed city extract keeps hosting simple. The basemap is loaded from OpenFreeMap.
+
+To rebuild the two city files with Python 3.12 or newer:
+
+```sh
+python -m venv .venv
+source .venv/bin/activate
+pip install -r scripts/requirements.txt
+scripts/extract.sh
+```
+
+Map and routing data © OpenStreetMap contributors and Overture Maps Foundation. The derived walking network is distributed under the [Open Database License](https://opendatacommons.org/licenses/odbl/1-0/). Address and place data retain their [Overture source terms](https://docs.overturemaps.org/attribution/).
