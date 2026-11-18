@@ -1,3 +1,4 @@
+import { afterFrame } from './afterFrame'
 import ThemeRaster from './ThemeRaster'
 import * as L from 'leaflet'
 import { zoomPoint } from './zoomTransform'
@@ -6,6 +7,7 @@ import type { CartoPaint } from './FlightPreview'
 // Paint settled detail into a screen-sized buffer. Its dimensions never grow
 // with the geographic extent of the city, even at the closest zoom.
 export default class ViewportDrawing extends L.Layer {
+  private cancelDraw?: () => void
   private corner?: L.LatLng
   private paintedZoom = 0
   private paintFrame?: { visible: L.LatLngBounds; ratio: number; scale: number; origin: L.Point }
@@ -26,12 +28,20 @@ export default class ViewportDrawing extends L.Layer {
   }
 
   onRemove() {
+    this.cancelDraw?.()
     this.raster.stop()
     this.canvas.remove()
     return this
   }
 
-  getEvents() { return { zoomanim: this.position, zoom: this.position, moveend: this.draw, viewreset: this.draw } }
+  getEvents() { return { zoomanim: this.position, zoom: this.position, movestart: this.stopDraw, moveend: this.scheduleDraw, viewreset: this.scheduleDraw } }
+
+  private stopDraw = () => this.cancelDraw?.()
+
+  private scheduleDraw = () => {
+    this.stopDraw()
+    this.cancelDraw = afterFrame(this.draw)
+  }
 
   private draw = () => {
     const map = this._map
@@ -40,8 +50,10 @@ export default class ViewportDrawing extends L.Layer {
     const extent = size.add(pad.multiplyBy(2))
     const start = map.containerPointToLatLng(pad.multiplyBy(-1))
     const ratio = Math.min(window.devicePixelRatio || 1, 2)
-    this.canvas.width = Math.ceil(extent.x * ratio)
-    this.canvas.height = Math.ceil(extent.y * ratio)
+    const width = Math.ceil(extent.x * ratio)
+    const height = Math.ceil(extent.y * ratio)
+    if (this.canvas.width !== width) this.canvas.width = width
+    if (this.canvas.height !== height) this.canvas.height = height
     this.canvas.style.width = extent.x + 'px'
     this.canvas.style.height = extent.y + 'px'
     this.corner = start

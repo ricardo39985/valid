@@ -488,6 +488,10 @@ h1, p { margin: 0; }
 canvas.carto-surface { position: absolute; top: 0; left: 0; transform-origin: top left; }
 .flight-preview { position: absolute; top: 0; left: 0; transform-origin: top left; pointer-events: none; }
 .address-flight :is(.carto-surface, .leaflet-buildings-pane, .scene-pane, .leaflet-street-labels-pane) { visibility: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .leaflet-buildings-pane { opacity: 1; transition: opacity 140ms ease-out; }
+  .leaflet-buildings-pane.building-zooming { visibility: hidden; opacity: 0; transition: none; }
+}
 .map-canvas:not(.address-flight) :is(.leaflet-buildings-pane, .scene-pane, .leaflet-street-labels-pane) { animation: detail-return 190ms ease-out; }
 @keyframes detail-return { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {

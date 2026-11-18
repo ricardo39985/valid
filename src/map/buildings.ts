@@ -1,4 +1,5 @@
 import * as L from 'leaflet'
+import { afterFrame } from './afterFrame'
 import GeographicOverlay from './GeographicOverlay'
 import { fetchPackedJson } from '../assets/packedJson'
 import type { Coordinate } from '../routing/types'
@@ -97,10 +98,31 @@ export function buildingLayer(map: L.Map) {
     tiles.addTo(map)
     prepare(map.getBounds(), true)
   }
-  map.on('moveend', update)
+  let cancelUpdate: (() => void) | undefined
+  const pane = map.getPane('buildings')!
+  function startZoom() { pane.classList.add('building-zooming') }
+  function stopUpdate() { cancelUpdate?.() }
+  function scheduleUpdate() {
+    stopUpdate()
+    cancelUpdate = afterFrame(() => {
+      update()
+      pane.classList.remove('building-zooming')
+    })
+  }
+  map.on('zoomstart', startZoom)
+  map.on('movestart', stopUpdate)
+  map.on('moveend', scheduleUpdate)
   update()
   return {
     warm([lng, lat]: Coordinate) { prepare(L.latLng(lat, lng).toBounds(1800)) },
-    dispose() { disposed = true; map.off('moveend', update); tiles.remove() },
+    dispose() {
+      disposed = true
+      stopUpdate()
+      pane.classList.remove('building-zooming')
+      map.off('zoomstart', startZoom)
+      map.off('movestart', stopUpdate)
+      map.off('moveend', scheduleUpdate)
+      tiles.remove()
+    },
   }
 }

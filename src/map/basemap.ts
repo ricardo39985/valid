@@ -1,5 +1,6 @@
 import * as L from 'leaflet'
 import { prefersReducedMotion, settle } from './motion'
+import { afterFrame } from './afterFrame'
 import { cartoSurface } from './cartoSurface'
 import type { FeatureCollection } from 'geojson'
 import type { Basemap } from '../assets/loadAssets'
@@ -28,9 +29,16 @@ export function addBasemap(map: L.Map, data: Basemap) {
   cartoSurface(L.latLngBounds([37.704, -122.525], [37.837, -122.349]), 'city-cartography', data.areas, data.streets).addTo(layers)
 
   const labels = L.layerGroup().addTo(layers)
+  const markers = new Map<Basemap['labels']['features'][number], L.Marker>()
+  let cancelLabels: (() => void) | undefined
+
   function updateLabels() {
-    labels.clearLayers()
-    if (map.getZoom() < 13) return
+    if (map.getZoom() < 13) {
+      labels.clearLayers()
+      markers.clear()
+      return
+    }
+    const visible = new Set<Basemap['labels']['features'][number]>()
     const bounds = map.getBounds()
     const names = new Set<string>()
     const used: L.Bounds[] = []
@@ -51,25 +59,46 @@ export function addBasemap(map: L.Map, data: Basemap) {
       if (used.some(box => box.intersects(labelBounds))) continue
       used.push(labelBounds)
       names.add(name)
+      visible.add(feature)
+      if (markers.has(feature)) continue
       const label = document.createElement('span')
       label.className = 'street-label'
       label.textContent = name
       label.style.setProperty('--angle', `${angle}deg`)
-      L.marker(point, {
+      const marker = L.marker(point, {
         icon: L.divIcon({ className: 'street-icon', html: label, iconSize: [0, 0] }),
         interactive: false, keyboard: false, pane: 'street-labels',
       }).addTo(labels)
+      markers.set(feature, marker)
       if (!prefersReducedMotion()) label.animate?.([{ opacity: 0 }, { opacity: 1 }],
         { duration: 240, easing: settle })
     }
+    for (const [feature, marker] of markers) {
+      if (visible.has(feature)) continue
+      markers.delete(feature)
+      labels.removeLayer(marker)
+    }
   }
+  function stopLabels() { cancelLabels?.() }
+  function scheduleLabels() {
+    stopLabels()
+    cancelLabels = afterFrame(updateLabels)
+  }
+
   function setDetailVisibility() {
     if (map.getZoom() >= 13) layers.addTo(map)
     else layers.remove()
   }
   map.on('zoomend', setDetailVisibility)
   setDetailVisibility()
-  map.on('moveend', updateLabels)
+  map.on('movestart', stopLabels)
+  map.on('moveend', scheduleLabels)
   updateLabels()
-  return () => { map.off('moveend', updateLabels); map.off('zoomend', setDetailVisibility); layers.remove() }
+  return () => {
+    stopLabels()
+    map.off('movestart', stopLabels)
+    map.off('moveend', scheduleLabels)
+    map.off('zoomend', setDetailVisibility)
+    layers.remove()
+  }
 }
